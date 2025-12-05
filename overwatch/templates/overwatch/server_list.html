@@ -1,0 +1,311 @@
+{% extends "base.html" %}
+{% block title %}Servers - NexHub{% endblock %}
+{% block content %}
+<div class="bg-white shadow-xl rounded-xl p-6 space-y-6 border border-slate-100">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <h1 class="text-2xl font-semibold text-slate-900">Servers</h1>
+            <p class="text-sm text-slate-600">Spreadsheet-like controls: global search, column filters, pagination.</p>
+        </div>
+        <div class="flex flex-col gap-3 lg:items-end">
+            <form
+                id="filters"
+                method="get"
+                class="flex flex-col gap-3 lg:flex-row lg:items-center"
+            >
+                <input
+                    id="search"
+                    type="search"
+                    name="q"
+                    value="{{ query }}"
+                    placeholder="Global search across all columns"
+                    class="w-full lg:w-96 rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
+                />
+                <input type="hidden" name="page_size" value="{{ page_size }}">
+            </form>
+            <div class="flex flex-wrap gap-3 text-sm text-slate-700">
+                <span class="font-medium text-slate-800">Toggle columns:</span>
+                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                    <input type="checkbox" data-toggle-col="disk_count" class="rounded border-slate-300" />
+                    Disk count
+                </label>
+                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                    <input type="checkbox" data-toggle-col="data_source" class="rounded border-slate-300" />
+                    Data source
+                </label>
+                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
+                    <input type="checkbox" data-toggle-col="tags" class="rounded border-slate-300" />
+                    Tags
+                </label>
+                <button
+                    type="button"
+                    id="reset-table"
+                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 hover:bg-slate-200"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
+                    </svg>
+                    Reset table
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div id="server-table">
+        {% include "overwatch/server_list_partial.html" %}
+    </div>
+</div>
+
+<script>
+    function persistColumnToggles() {
+        const toggles = document.querySelectorAll('[data-toggle-col]');
+        const state = {};
+        toggles.forEach((t) => (state[t.dataset.toggleCol] = t.checked));
+        localStorage.setItem('columnToggles', JSON.stringify(state));
+    }
+
+    function applyColumnToggles() {
+        const toggles = document.querySelectorAll('[data-toggle-col]');
+        toggles.forEach((toggle) => {
+            const col = toggle.dataset.toggleCol;
+            const show = toggle.checked;
+            document.querySelectorAll(`[data-col="${col}"]`).forEach((el) => {
+                el.classList.toggle('hidden', !show);
+            });
+        });
+        persistColumnToggles();
+    }
+
+    function attachTableReset() {
+        const btn = document.getElementById('reset-table');
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+            window.location.href = window.location.pathname;
+        });
+    }
+
+    function initColumnFilters() {
+        const headers = document.querySelectorAll('th[data-col]');
+        headers.forEach((header) => {
+            const col = header.dataset.col;
+            const panel = header.querySelector(`[data-filter-panel="${col}"]`);
+            const btn = header.querySelector(`[data-filter-btn="${col}"]`);
+            if (!panel || !btn) return;
+
+            const values = Array.from(document.querySelectorAll(`tbody td[data-col="${col}"]`))
+                .map((td) => td.textContent.trim())
+                .filter((v) => v !== "");
+            const unique = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+
+            let working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+
+            const renderList = (items) => {
+                return items
+                    .map(
+                        (val) => `
+                        <label class="flex items-center gap-2 text-xs text-slate-700">
+                            <input type="checkbox" class="rounded border-slate-300" data-filter-checkbox="${col}" value="${val.replace(/"/g, "&quot;")}" ${working.has(val) ? "checked" : ""} />
+                            <span class="truncate" title="${val}">${val || "—"}</span>
+                        </label>
+                    `
+                    )
+                    .join("");
+            };
+
+            panel.innerHTML = `
+                <div class="p-3 space-y-3 text-slate-800">
+                    <div class="flex items-center gap-2">
+                        <input type="search" placeholder="Search values" data-filter-search="${col}"
+                            class="w-full rounded border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-xs px-2 py-1">
+                        <button type="button" data-filter-sort="${col}" data-dir="asc" class="px-2 py-1 rounded bg-slate-100 text-xs border border-slate-200 hover:bg-slate-200 flex items-center gap-1">
+                            <span class="text-xs">▲</span><span class="text-[11px]">A–Z</span>
+                        </button>
+                        <button type="button" data-filter-sort="${col}" data-dir="desc" class="px-2 py-1 rounded bg-slate-100 text-xs border border-slate-200 hover:bg-slate-200 flex items-center gap-1">
+                            <span class="text-xs">▼</span><span class="text-[11px]">Z–A</span>
+                        </button>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs">
+                        <button type="button" data-filter-selectall="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Select all</button>
+                        <button type="button" data-filter-clear="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Unselect all</button>
+                    </div>
+                    <div class="max-h-52 overflow-y-auto space-y-1" data-filter-list="${col}">
+                        ${renderList(unique)}
+                    </div>
+                    <div class="flex items-center gap-2 justify-end text-xs pt-1">
+                        <button type="button" data-filter-cancel="${col}" class="px-3 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Cancel</button>
+                        <button type="button" data-filter-apply="${col}" class="px-3 py-1 rounded bg-blue-600 text-white border border-blue-600 hover:bg-blue-700">Apply</button>
+                    </div>
+                </div>
+            `;
+
+            const listEl = panel.querySelector(`[data-filter-list="${col}"]`);
+            const searchInput = panel.querySelector(`[data-filter-search="${col}"]`);
+
+            searchInput.addEventListener('input', () => {
+                const term = searchInput.value.toLowerCase();
+                const filtered = unique.filter((v) => v.toLowerCase().includes(term));
+                listEl.innerHTML = renderList(filtered);
+            });
+
+            panel.addEventListener('change', (e) => {
+                if (e.target.matches(`[data-filter-checkbox="${col}"]`)) {
+                    const val = e.target.value;
+                    if (e.target.checked) {
+                        working.add(val);
+                    } else {
+                        working.delete(val);
+                    }
+                }
+            });
+
+            panel.addEventListener('click', (e) => {
+                if (e.target.closest(`[data-filter-selectall="${col}"]`)) {
+                    working = new Set(unique);
+                    listEl.innerHTML = renderList(unique);
+                }
+                if (e.target.closest(`[data-filter-clear="${col}"]`)) {
+                    working = new Set();
+                    listEl.innerHTML = renderList(unique);
+                }
+                if (e.target.closest(`[data-filter-sort="${col}"]`)) {
+                    const dir = e.target.closest(`[data-filter-sort]`).dataset.dir;
+                    sortTable(col, dir);
+                }
+                if (e.target.closest(`[data-filter-apply="${col}"]`)) {
+                    window.__activeFilterState[col] = new Set(working);
+                    applyFilters();
+                    panel.classList.add('hidden');
+                }
+                if (e.target.closest(`[data-filter-cancel="${col}"]`)) {
+                    working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+                    listEl.innerHTML = renderList(unique);
+                    panel.classList.add('hidden');
+                }
+            });
+
+            btn.addEventListener('click', () => {
+                const currentlyOpen = document.querySelectorAll('[data-filter-panel]');
+                currentlyOpen.forEach((p) => {
+                    if (p !== panel) p.classList.add('hidden');
+                });
+                panel.classList.toggle('hidden');
+                // After showing, ensure it stays within viewport vertically
+                if (!panel.classList.contains('hidden')) {
+                    const rect = panel.getBoundingClientRect();
+                    if (rect.top < 0) {
+                        panel.style.marginTop = `${Math.abs(rect.top) + 8}px`;
+                    } else {
+                        panel.style.marginTop = "0";
+                    }
+                    // Clamp horizontally within viewport
+                    let shift = 0;
+                    if (rect.left < 8) {
+                        shift = 8 - rect.left;
+                    } else if (rect.right > window.innerWidth - 8) {
+                        shift = (window.innerWidth - 8) - rect.right;
+                    }
+                    panel.style.marginLeft = `${shift}px`;
+                }
+            });
+        });
+    }
+
+    function applyFilters() {
+        const rows = document.querySelectorAll('tbody tr[data-row]');
+        rows.forEach((row) => {
+            let visible = true;
+            for (const [col, values] of Object.entries(window.__activeFilterState)) {
+                if (!values || values.size === 0) {
+                    continue; // empty means no filter applied on this column
+                }
+                const cell = row.querySelector(`td[data-col="${col}"]`);
+                const cellVal = (cell?.textContent || "").trim();
+                if (!values.has(cellVal)) {
+                    visible = false;
+                    break;
+                }
+            }
+            row.classList.toggle('hidden', !visible);
+        });
+    }
+
+    function sortTable(col, direction) {
+        const tbody = document.querySelector('tbody');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr[data-row]'));
+        rows.sort((a, b) => {
+            const av = (a.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim().toLowerCase();
+            const bv = (b.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim().toLowerCase();
+            return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        });
+        rows.forEach((row) => tbody.appendChild(row));
+    }
+
+    function persistColumnToggles() {
+        const toggles = document.querySelectorAll('[data-toggle-col]');
+        const state = {};
+        toggles.forEach((t) => (state[t.dataset.toggleCol] = t.checked));
+        localStorage.setItem('columnToggles', JSON.stringify(state));
+    }
+
+    function applyColumnToggles() {
+        const toggles = document.querySelectorAll('[data-toggle-col]');
+        toggles.forEach((toggle) => {
+            const col = toggle.dataset.toggleCol;
+            const show = toggle.checked;
+            document.querySelectorAll(`[data-col="${col}"]`).forEach((el) => {
+                el.classList.toggle('hidden', !show);
+            });
+        });
+        persistColumnToggles();
+    }
+
+    function initUI() {
+        window.__activeFilterState = window.__activeFilterState || {};
+        // restore toggle state
+        const saved = localStorage.getItem('columnToggles');
+        if (saved) {
+            try {
+                const state = JSON.parse(saved);
+                document.querySelectorAll('[data-toggle-col]').forEach((t) => {
+                    if (state.hasOwnProperty(t.dataset.toggleCol)) {
+                        t.checked = state[t.dataset.toggleCol];
+                    }
+                });
+            } catch (e) {
+                console.warn('Could not parse column toggle state', e);
+            }
+        }
+        applyColumnToggles();
+        attachTableReset();
+        initColumnFilters();
+        // page size select submit form
+        const pageSizeSelect = document.getElementById('page-size-select');
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', () => {
+                const form = document.getElementById('filters');
+                if (form) form.submit();
+            });
+        }
+    }
+
+    document.addEventListener('change', (event) => {
+        if (event.target.matches('[data-toggle-col]')) {
+            applyColumnToggles();
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        initUI();
+        const pageSizeSelect = document.getElementById('page-size-select');
+        if (pageSizeSelect) {
+            pageSizeSelect.addEventListener('change', () => {
+                const form = document.getElementById('filters');
+                if (form) form.submit();
+            });
+        }
+    });
+
+    // No HTMX afterSwap needed; using full page reload for pagination/page size
+</script>
+{% endblock %}

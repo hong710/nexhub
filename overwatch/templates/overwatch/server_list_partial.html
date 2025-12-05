@@ -1,0 +1,112 @@
+<div id="server-table" class="relative overflow-x-auto overflow-y-visible rounded-lg border border-slate-200 shadow-inner min-h-[90vh]">
+    <table class="min-w-[2200px] divide-y divide-slate-200 text-xs">
+        <thead class="bg-blue-800 text-white">
+            <tr>
+                {% for col, label in table_headers %}
+                <th class="px-3 py-3 text-left font-semibold relative align-top {% if col in 'disk_count data_source tags' %}hidden{% endif %}" data-col="{{ col }}">
+                    <div class="flex items-center justify-between gap-2">
+                        <span>{{ label }}</span>
+                        <button type="button" class="p-1 rounded bg-white/10 hover:bg-white/20" data-filter-btn="{{ col }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M8 12h8m-5 7h2" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div class="absolute z-[3000] top-full mt-2 left-1/2 -translate-x-1/4 w-72 bg-white border border-slate-200 rounded-lg shadow-2xl hidden" data-filter-panel="{{ col }}"></div>
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-200 bg-white">
+            {% for server in page_obj %}
+            <tr class="hover:bg-blue-50" data-row>
+                <td class="px-3 py-3 text-[13px] font-medium text-blue-800 hover:underline" data-col="hostname">
+                    <a href="{% url 'overwatch:server_detail' server.pk %}">{{ server.hostname }}</a>
+                </td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="ip_address">{{ server.ip_address|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="bmc_ip">{{ server.bmc_ip|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="os">{{ server.os|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="os_version">{{ server.os_version|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="kernel">{{ server.kernel|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="cpu">{{ server.cpu|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="core_count">{{ server.core_count|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="manufacture">{{ server.manufacture|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="product_name">{{ server.product_name|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="bios_version">{{ server.bios_version|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="room">{{ server.room|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="rack">{{ server.rack|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="location">{{ server.location|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700" data-col="updated_at">{{ server.updated_at|date:"Y-m-d H:i" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700 hidden" data-col="disk_count">{{ server.disk_count|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700 hidden" data-col="data_source">{{ server.data_source|default:"—" }}</td>
+                <td class="px-3 py-3 text-[13px] text-slate-700 hidden" data-col="tags">{{ server.tags|default:"—" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="18" class="px-3 py-4 text-center text-sm text-slate-600">No servers found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mt-4 gap-3">
+    <div class="flex flex-wrap items-center gap-3">
+        <div class="text-sm text-slate-600">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+        </div>
+        <div class="flex items-center gap-2">
+            <a
+                href="?page=1&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
+            >&laquo;</a>
+            {% if page_obj.has_previous %}
+            <a
+                href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
+            >&lsaquo;</a>
+            {% else %}
+            <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70">&lsaquo;</span>
+            {% endif %}
+            <div class="inline-flex items-center gap-1">
+                {% for p in elided_pages %}
+                    {% if p == '…' %}
+                        <span class="px-2 py-2 text-sm text-slate-500">…</span>
+                    {% elif p == page_obj.number %}
+                        <span class="px-3 py-2 text-sm bg-blue-600 text-white rounded border border-blue-600">{{ p }}</span>
+                    {% else %}
+                        <a
+                            href="?page={{ p }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                            class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
+                        >{{ p }}</a>
+                    {% endif %}
+                {% endfor %}
+            </div>
+            {% if page_obj.has_next %}
+            <a
+                href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
+            >&rsaquo;</a>
+            {% else %}
+            <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70">&rsaquo;</span>
+            {% endif %}
+            <a
+                href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
+                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
+            >&raquo;</a>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+            <span>Records per page</span>
+            <select
+                id="page-size-select"
+                name="page_size"
+                form="filters"
+                class="rounded border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"
+            >
+                {% for size in page_sizes %}
+                <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
+                {% endfor %}
+            </select>
+        </label>
+    </div>
+</div>

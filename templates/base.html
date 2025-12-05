@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}NexHub{% endblock %}</title>
+    <!-- Tailwind CDN for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Flowbite components -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.css" rel="stylesheet" />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flowbite/2.2.1/flowbite.min.js" defer></script>
+    <!-- HTMX for partial updates -->
+    <script src="https://unpkg.com/htmx.org@1.9.12" defer></script>
+</head>
+<body class="bg-slate-50 min-h-screen">
+    <div class="bg-blue-900 text-white shadow">
+        <nav class="px-6 py-4">
+            <div class="max-w-7xl lg:max-w-[1400px] mx-auto flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-xl font-semibold">
+                        NH
+                    </div>
+                    <div>
+                        <div class="text-xl font-semibold tracking-tight">NexHub</div>
+                        <div class="text-xs uppercase tracking-[0.2em] text-white/70">Overwatch</div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-4 text-sm">
+                    <div class="flex items-center gap-3">
+                        <a href="#" class="hover:text-blue-100">Dashboard</a>
+                        <a href="/" class="hover:text-blue-100">Servers</a>
+                        <a href="#" class="hover:text-blue-100">IPAM</a>
+                        <a href="#" class="hover:text-blue-100">Subnets</a>
+                        {% if request.user.is_staff %}
+                        <a href="#" class="hover:text-blue-100">Dictionary</a>
+                        {% endif %}
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="px-2 py-1 rounded bg-white/10 text-xs">Logged in as {{ request.user.username|default:"guest" }}</span>
+                        {% if request.user.is_authenticated %}
+                        <a href="/admin/logout/" class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-xs">Logout</a>
+                        {% else %}
+                        <a href="/admin/login/" class="px-3 py-1 rounded bg-white/10 hover:bg-white/20 border border-white/20 text-xs">Login</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </nav>
+    </div>
+    <main class="max-w-7xl lg:max-w-[1800px] mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
