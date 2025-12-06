@@ -5,9 +5,17 @@
                 <tr>
                     <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 w-12">#</th>
                     {% for col, label in table_headers %}
-                    <th class="px-2 py-2 text-left font-semibold relative align-top border-r border-blue-900 last:border-r-0 {% if col in 'disk_count data_source tags' %}hidden{% endif %} col-{{ col }} whitespace-nowrap" data-col="{{ col }}">
+                    <th class="px-2 py-2 text-left font-semibold relative align-top border-r border-blue-900 last:border-r-0 {% if col in 'disk_count data_source tags product_name' %}hidden{% endif %} col-{{ col }} whitespace-nowrap" data-col="{{ col }}">
                         <div class="flex items-center justify-between gap-1">
-                            <span>{{ label }}</span>
+                            <span class="inline-flex items-center gap-1">
+                                {{ label }}
+                                {% if col == 'platform' %}
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-green-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h12a2 2 0 012 2v8a2 2 0 01-2 2H4z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 9h6M8 12h6M8 15h3" />
+                                </svg>
+                                {% endif %}
+                            </span>
                             <button type="button" class="p-1 rounded bg-white/10 hover:bg-white/20" data-filter-btn="{{ col }}">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M8 12h8m-5 7h2" />
@@ -37,6 +45,7 @@
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-core_count whitespace-nowrap" data-col="core_count">{{ server.core_count|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-manufacture whitespace-nowrap" data-col="manufacture">{{ server.manufacture|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-product_name whitespace-nowrap" data-col="product_name">{{ server.product_name|default:"—" }}</td>
+                    <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-platform whitespace-nowrap" data-col="platform">{{ server.platform_display|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-bios_version whitespace-nowrap" data-col="bios_version">{{ server.bios_version|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-room whitespace-nowrap" data-col="room">{{ server.room|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-rack whitespace-nowrap" data-col="rack">{{ server.rack|default:"—" }}</td>
@@ -44,11 +53,20 @@
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-updated_at whitespace-nowrap" data-col="updated_at">{{ server.updated_at|date:"Y-m-d H:i" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="disk_count">{{ server.disk_count|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="data_source">{{ server.data_source|default:"—" }}</td>
-                    <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="tags">{{ server.tags|default:"—" }}</td>
+                    <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="tags">
+                        {% if server.tags_list %}
+                            {% for trimmed in server.tags_list %}
+                                {% cycle 'bg-blue-100 text-blue-800 border-blue-200' 'bg-green-100 text-green-800 border-green-200' 'bg-purple-100 text-purple-800 border-purple-200' 'bg-amber-100 text-amber-800 border-amber-200' as tag_color silent %}
+                                <span class="inline-flex items-center px-2 py-0.5 mr-1 mb-1 rounded-full text-[11px] font-medium border {{ tag_color }}">{{ trimmed }}</span>
+                            {% endfor %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="18" class="px-3 py-4 text-center text-sm text-slate-600">No servers found.</td>
+                    <td colspan="19" class="px-3 py-4 text-center text-sm text-slate-600">No servers found.</td>
                 </tr>
                 {% endfor %}
             </tbody>

@@ -1,0 +1,58 @@
+<div class="space-y-4">
+    <form method="post" action="{{ form_action|default:request.path }}" class="space-y-4">
+        {% csrf_token %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Translate from (Server column)</label>
+                {{ form.translate_from }}
+                {% if form.translate_from.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.translate_from.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Original keyword</label>
+                {{ form.original_keyword }}
+                {% if form.original_keyword.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.original_keyword.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Translate To</label>
+                {{ form.category }}
+                {% if form.category.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.category.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Standardized value</label>
+                {{ form.standardized_value }}
+                {% if form.standardized_value.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.standardized_value.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Active</label>
+                <div class="flex items-center gap-2">
+                    {{ form.is_active }}
+                    <span class="text-sm text-slate-700">Mark as active</span>
+                </div>
+                {% if form.is_active.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.is_active.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.description.errors.0 }}</p>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center">
+                {{ submit_label|default:"Save" }}
+            </button>
+            <button type="button" data-modal-hide="dict-modal" class="text-sm text-gray-700 hover:underline">Cancel</button>
+        </div>
+    </form>
+</div>

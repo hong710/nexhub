@@ -441,7 +441,7 @@
         const saved = localStorage.getItem('columnToggles_v2');
         const toggles = Array.from(document.querySelectorAll('[data-toggle-col]'));
         const defaultState = {};
-        const hiddenByDefault = ['disk_count', 'data_source', 'tags', 'manufacture', 'bios_version'];
+        const hiddenByDefault = ['disk_count', 'data_source', 'tags', 'manufacture', 'bios_version', 'product_name'];
         toggles.forEach((t) => {
             defaultState[t.dataset.toggleCol] = hiddenByDefault.includes(t.dataset.toggleCol) ? false : true;
         });

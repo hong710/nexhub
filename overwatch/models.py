@@ -152,6 +152,7 @@ class IPAM(BaseModel):
 
 
 class DataDictionary(BaseModel):
+    translate_from = models.CharField(max_length=200, blank=True, null=True)
     original_keyword = models.CharField(max_length=255)
     category = models.CharField(max_length=50, choices=DICTIONARY_CATEGORY_CHOICES)
     standardized_value = models.CharField(max_length=255)
