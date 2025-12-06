@@ -12,6 +12,7 @@ def server_list(request: HttpRequest) -> HttpResponse:
     HTMX can update the table body without reloading the whole page.
     """
 
+    total_all_count = Server.objects.count()
     servers = Server.objects.all()
 
     # Search across many visible fields
@@ -42,25 +43,36 @@ def server_list(request: HttpRequest) -> HttpResponse:
     # Default ordering for consistency
     servers = servers.order_by("hostname")
 
-    page_size = request.GET.get("page_size")
+    page_size_input = request.GET.get("page_size")
     try:
-        page_size = int(page_size) if page_size else 25
+        requested_page_size = int(page_size_input) if page_size_input else 25
     except ValueError:
-        page_size = 25
-    if page_size not in [25, 50, 100, 200]:
-        page_size = 25
+        requested_page_size = 25
+    if requested_page_size not in [25, 50, 100, 200]:
+        requested_page_size = 25
 
     page_sizes = [25, 50, 100, 200]
 
-    paginator = Paginator(servers, page_size)
+    filtered_count = servers.count()
+
+    # If the filtered result set is smaller than the requested page size,
+    # auto-shrink the page size so pagination collapses to a single page.
+    page_size_disabled = False
+    effective_page_size = requested_page_size
+    if filtered_count < requested_page_size:
+        effective_page_size = max(filtered_count, 1)
+        page_size_disabled = True
+
+    paginator = Paginator(servers, effective_page_size)
     page_number = request.GET.get("page")
     page_obj = paginator.get_page(page_number)
     elided_pages = paginator.get_elided_page_range(number=page_obj.number, on_each_side=1, on_ends=1)
+    page_offset = page_obj.start_index() - 1 if filtered_count else 0
 
     table_headers = [
-        ("hostname", "Hostname"),
         ("ip_address", "IP"),
         ("bmc_ip", "BMC IP"),
+        ("hostname", "Hostname"),
         ("os", "OS"),
         ("os_version", "OS Version"),
         ("kernel", "Kernel"),
@@ -78,13 +90,26 @@ def server_list(request: HttpRequest) -> HttpResponse:
         ("tags", "Tags"),
     ]
 
+    col_toggles = [
+        ("manufacture", "Manufacture"),
+        ("bios_version", "BIOS Version"),
+        ("disk_count", "Disk count"),
+        ("data_source", "Data source"),
+        ("tags", "Tags"),
+    ]
+
     context = {
         "page_obj": page_obj,
         "query": query or "",
         "table_headers": table_headers,
-        "page_size": page_size,
+        "page_size": effective_page_size,
         "page_sizes": page_sizes,
         "elided_pages": elided_pages,
+        "col_toggles": col_toggles,
+        "filtered_count": filtered_count,
+        "total_all_count": total_all_count,
+        "page_size_disabled": page_size_disabled,
+        "page_offset": page_offset,
     }
 
     template = "overwatch/server_list_partial.html" if request.headers.get("HX-Request") else "overwatch/server_list.html"

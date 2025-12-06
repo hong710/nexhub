@@ -1,57 +1,62 @@
 {% extends "base.html" %}
 {% block title %}Servers - NexHub{% endblock %}
 {% block content %}
-<div class="bg-white shadow-xl rounded-xl p-6 space-y-6 border border-slate-100">
-    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-            <h1 class="text-2xl font-semibold text-slate-900">Servers</h1>
-            <p class="text-sm text-slate-600">Spreadsheet-like controls: global search, column filters, pagination.</p>
-        </div>
-        <div class="flex flex-col gap-3 lg:items-end">
+<div class="bg-white h-full flex flex-col overflow-hidden">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
+        <div class="flex items-center gap-3 flex-wrap">
+            <div class="flex items-center gap-2 text-blue-900">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="4" y="4" width="16" height="6" rx="1.5" ry="1.5"></rect>
+                    <rect x="4" y="14" width="16" height="6" rx="1.5" ry="1.5"></rect>
+                    <circle cx="8" cy="7" r="0.75"></circle>
+                    <circle cx="8" cy="17" r="0.75"></circle>
+                </svg>
+                <h1 class="text-2xl font-semibold text-slate-900">Servers</h1>
+            </div>
             <form
                 id="filters"
-                method="get"
-                class="flex flex-col gap-3 lg:flex-row lg:items-center"
+                hx-get="."
+                hx-target="#server-table"
+                hx-trigger="keyup changed delay:250ms from:#search, submit"
+                hx-include="#page-size-select"
+                hx-swap="outerHTML"
+                class="flex items-center gap-2"
             >
                 <input
                     id="search"
                     type="search"
                     name="q"
                     value="{{ query }}"
-                    placeholder="Global search across all columns"
-                    class="w-full lg:w-96 rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
+                    placeholder="Global search"
+                    class="w-72 rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
                 />
                 <input type="hidden" name="page_size" value="{{ page_size }}">
             </form>
-            <div class="flex flex-wrap gap-3 text-sm text-slate-700">
-                <span class="font-medium text-slate-800">Toggle columns:</span>
-                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
-                    <input type="checkbox" data-toggle-col="disk_count" class="rounded border-slate-300" />
-                    Disk count
-                </label>
-                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
-                    <input type="checkbox" data-toggle-col="data_source" class="rounded border-slate-300" />
-                    Data source
-                </label>
-                <label class="inline-flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-lg border border-slate-200">
-                    <input type="checkbox" data-toggle-col="tags" class="rounded border-slate-300" />
-                    Tags
-                </label>
-                <button
-                    type="button"
-                    id="reset-table"
-                    class="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-slate-100 border border-slate-200 text-slate-800 hover:bg-slate-200"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
-                    </svg>
-                    Reset table
-                </button>
-            </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700 px-1">
+            <span class="font-medium text-slate-800 mr-1">Toggle columns:</span>
+            {% for col_key, col_label in col_toggles %}
+            <label class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full border border-slate-200 bg-white shadow-sm hover:border-blue-500 hover:text-blue-700">
+                <input type="checkbox" data-toggle-col="{{ col_key }}" class="rounded border-slate-300" />
+                <span class="text-xs font-medium">{{ col_label }}</span>
+            </label>
+            {% endfor %}
+            <button
+                type="button"
+                id="reset-table"
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white border border-slate-200 text-slate-800 shadow-sm hover:border-blue-500 hover:text-blue-700"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
+                </svg>
+                <span class="text-xs font-medium">Reset</span>
+            </button>
         </div>
     </div>
 
-    <div id="server-table">
+    <div class="h-3"></div>
+
+    <div id="server-table" class="flex-1 overflow-hidden min-h-0 px-0">
         {% include "overwatch/server_list_partial.html" %}
     </div>
 </div>
@@ -61,7 +66,7 @@
         const toggles = document.querySelectorAll('[data-toggle-col]');
         const state = {};
         toggles.forEach((t) => (state[t.dataset.toggleCol] = t.checked));
-        localStorage.setItem('columnToggles', JSON.stringify(state));
+        localStorage.setItem('columnToggles_v2', JSON.stringify(state));
     }
 
     function applyColumnToggles() {
@@ -92,104 +97,119 @@
             const btn = header.querySelector(`[data-filter-btn="${col}"]`);
             if (!panel || !btn) return;
 
-            const values = Array.from(document.querySelectorAll(`tbody td[data-col="${col}"]`))
-                .map((td) => td.textContent.trim())
-                .filter((v) => v !== "");
-            const unique = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+            const buildPanel = () => {
+                const visibleRows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter(
+                    (tr) => !tr.classList.contains('hidden')
+                );
+                const sourceCells =
+                    visibleRows.length > 0
+                        ? visibleRows.flatMap((tr) => Array.from(tr.querySelectorAll(`td[data-col="${col}"]`)))
+                        : Array.from(document.querySelectorAll(`tbody td[data-col="${col}"]`));
 
-            let working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+                const values = sourceCells
+                    .map((td) => td.textContent.trim())
+                    .filter((v) => v !== "");
+                const unique = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+                let working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
 
-            const renderList = (items) => {
-                return items
-                    .map(
-                        (val) => `
-                        <label class="flex items-center gap-2 text-xs text-slate-700">
-                            <input type="checkbox" class="rounded border-slate-300" data-filter-checkbox="${col}" value="${val.replace(/"/g, "&quot;")}" ${working.has(val) ? "checked" : ""} />
-                            <span class="truncate" title="${val}">${val || "—"}</span>
-                        </label>
-                    `
-                    )
-                    .join("");
-            };
+                const renderList = (items) => {
+                    return items
+                        .map(
+                            (val) => `
+                            <label class="flex items-center gap-2 text-xs text-slate-700">
+                                <input type="checkbox" class="rounded border-slate-300" data-filter-checkbox="${col}" value="${val.replace(/"/g, "&quot;")}" ${working.has(val) ? "checked" : ""} />
+                                <span class="truncate" title="${val}">${val || "—"}</span>
+                            </label>
+                        `
+                        )
+                        .join("");
+                };
 
-            panel.innerHTML = `
-                <div class="p-3 space-y-3 text-slate-800">
-                    <div class="flex items-center gap-2">
-                        <input type="search" placeholder="Search values" data-filter-search="${col}"
-                            class="w-full rounded border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-xs px-2 py-1">
-                        <button type="button" data-filter-sort="${col}" data-dir="asc" class="px-2 py-1 rounded bg-slate-100 text-xs border border-slate-200 hover:bg-slate-200 flex items-center gap-1">
-                            <span class="text-xs">▲</span><span class="text-[11px]">A–Z</span>
-                        </button>
-                        <button type="button" data-filter-sort="${col}" data-dir="desc" class="px-2 py-1 rounded bg-slate-100 text-xs border border-slate-200 hover:bg-slate-200 flex items-center gap-1">
-                            <span class="text-xs">▼</span><span class="text-[11px]">Z–A</span>
-                        </button>
+                panel.innerHTML = `
+                    <div class="p-3 space-y-3 text-slate-800">
+                        <div class="flex items-center gap-2">
+                            <input type="search" placeholder="Search values" data-filter-search="${col}"
+                                class="w-full rounded border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-xs px-2 py-1">
+                            <div class="flex flex-col gap-1">
+                                <button type="button" data-filter-sort="${col}" data-dir="asc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
+                                    <span class="text-[11px] font-semibold text-blue-700">A</span>
+                                    <span class="text-[11px]">Z</span>
+                                    <span class="text-xs">↓</span>
+                                </button>
+                                <button type="button" data-filter-sort="${col}" data-dir="desc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
+                                    <span class="text-[11px] font-semibold text-blue-700">Z</span>
+                                    <span class="text-[11px]">A</span>
+                                    <span class="text-xs">↓</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 text-xs">
+                            <button type="button" data-filter-selectall="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Select all</button>
+                            <button type="button" data-filter-clear="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Unselect all</button>
+                        </div>
+                        <div class="max-h-52 overflow-y-auto space-y-1" data-filter-list="${col}">
+                            ${renderList(unique)}
+                        </div>
+                        <div class="flex items-center gap-2 justify-end text-xs pt-1">
+                            <button type="button" data-filter-apply="${col}" class="px-3 py-1 rounded bg-blue-600 text-white border border-blue-600 hover:bg-blue-700">Apply</button>
+                            <button type="button" data-filter-cancel="${col}" class="px-3 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Cancel</button>
+                        </div>
                     </div>
-                    <div class="flex items-center gap-2 text-xs">
-                        <button type="button" data-filter-selectall="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Select all</button>
-                        <button type="button" data-filter-clear="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Unselect all</button>
-                    </div>
-                    <div class="max-h-52 overflow-y-auto space-y-1" data-filter-list="${col}">
-                        ${renderList(unique)}
-                    </div>
-                    <div class="flex items-center gap-2 justify-end text-xs pt-1">
-                        <button type="button" data-filter-cancel="${col}" class="px-3 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Cancel</button>
-                        <button type="button" data-filter-apply="${col}" class="px-3 py-1 rounded bg-blue-600 text-white border border-blue-600 hover:bg-blue-700">Apply</button>
-                    </div>
-                </div>
-            `;
+                `;
 
-            const listEl = panel.querySelector(`[data-filter-list="${col}"]`);
-            const searchInput = panel.querySelector(`[data-filter-search="${col}"]`);
+                const listEl = panel.querySelector(`[data-filter-list="${col}"]`);
+                const searchInput = panel.querySelector(`[data-filter-search="${col}"]`);
 
-            searchInput.addEventListener('input', () => {
-                const term = searchInput.value.toLowerCase();
-                const filtered = unique.filter((v) => v.toLowerCase().includes(term));
-                listEl.innerHTML = renderList(filtered);
-            });
+                searchInput.addEventListener('input', () => {
+                    const term = searchInput.value.toLowerCase();
+                    const filtered = unique.filter((v) => v.toLowerCase().includes(term));
+                    listEl.innerHTML = renderList(filtered);
+                });
 
-            panel.addEventListener('change', (e) => {
-                if (e.target.matches(`[data-filter-checkbox="${col}"]`)) {
-                    const val = e.target.value;
-                    if (e.target.checked) {
-                        working.add(val);
-                    } else {
-                        working.delete(val);
+                panel.addEventListener('change', (e) => {
+                    if (e.target.matches(`[data-filter-checkbox="${col}"]`)) {
+                        const val = e.target.value;
+                        if (e.target.checked) {
+                            working.add(val);
+                        } else {
+                            working.delete(val);
+                        }
                     }
-                }
-            });
+                });
 
-            panel.addEventListener('click', (e) => {
-                if (e.target.closest(`[data-filter-selectall="${col}"]`)) {
-                    working = new Set(unique);
-                    listEl.innerHTML = renderList(unique);
-                }
-                if (e.target.closest(`[data-filter-clear="${col}"]`)) {
-                    working = new Set();
-                    listEl.innerHTML = renderList(unique);
-                }
-                if (e.target.closest(`[data-filter-sort="${col}"]`)) {
-                    const dir = e.target.closest(`[data-filter-sort]`).dataset.dir;
-                    sortTable(col, dir);
-                }
-                if (e.target.closest(`[data-filter-apply="${col}"]`)) {
-                    window.__activeFilterState[col] = new Set(working);
-                    applyFilters();
-                    panel.classList.add('hidden');
-                }
-                if (e.target.closest(`[data-filter-cancel="${col}"]`)) {
-                    working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
-                    listEl.innerHTML = renderList(unique);
-                    panel.classList.add('hidden');
-                }
-            });
+                panel.addEventListener('click', (e) => {
+                    if (e.target.closest(`[data-filter-selectall="${col}"]`)) {
+                        working = new Set(unique);
+                        listEl.innerHTML = renderList(unique);
+                    }
+                    if (e.target.closest(`[data-filter-clear="${col}"]`)) {
+                        working = new Set();
+                        listEl.innerHTML = renderList(unique);
+                    }
+                    if (e.target.closest(`[data-filter-sort="${col}"]`)) {
+                        const dir = e.target.closest(`[data-filter-sort]`).dataset.dir;
+                        sortTable(col, dir);
+                    }
+                    if (e.target.closest(`[data-filter-apply="${col}"]`)) {
+                        window.__activeFilterState[col] = new Set(working);
+                        applyFilters();
+                        panel.classList.add('hidden');
+                    }
+                    if (e.target.closest(`[data-filter-cancel="${col}"]`)) {
+                        working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+                        listEl.innerHTML = renderList(unique);
+                        panel.classList.add('hidden');
+                    }
+                });
+            };
 
             btn.addEventListener('click', () => {
                 const currentlyOpen = document.querySelectorAll('[data-filter-panel]');
                 currentlyOpen.forEach((p) => {
                     if (p !== panel) p.classList.add('hidden');
                 });
+                buildPanel();
                 panel.classList.toggle('hidden');
-                // After showing, ensure it stays within viewport vertically
                 if (!panel.classList.contains('hidden')) {
                     const rect = panel.getBoundingClientRect();
                     if (rect.top < 0) {
@@ -197,7 +217,6 @@
                     } else {
                         panel.style.marginTop = "0";
                     }
-                    // Clamp horizontally within viewport
                     let shift = 0;
                     if (rect.left < 8) {
                         shift = 8 - rect.left;
@@ -227,6 +246,50 @@
             }
             row.classList.toggle('hidden', !visible);
         });
+        updateFilterIndicators();
+        renumberRows();
+        refreshPagination();
+    }
+
+    function updateVisibleCount() {
+        const countEl = document.getElementById('row-count');
+        if (!countEl) return;
+        const total = parseInt(countEl.dataset.total || "0", 10) || 0;
+        const serverFiltered = parseInt(countEl.dataset.filtered || "0", 10) || 0;
+        const rows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter((r) => !r.classList.contains('hidden'));
+        const hasFilters = Object.values(window.__activeFilterState || {}).some((set) => set && set.size > 0);
+        const displayCount = hasFilters ? rows.length : serverFiltered || rows.length;
+        countEl.textContent = `Count ${displayCount} of ${total} rows`;
+    }
+
+    function renumberRows() {
+        const rows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter((r) => !r.classList.contains('hidden'));
+        const hasFilters = Object.values(window.__activeFilterState || {}).some((set) => set && set.size > 0);
+        if (hasFilters) {
+            const pageSize = window.__clientPageSize || rows.length || 1;
+            const page = window.__clientPage || 1;
+            const startIndex = (page - 1) * pageSize;
+            rows.forEach((row, idx) => {
+                const numCell = row.querySelector('td');
+                if (numCell) numCell.textContent = startIndex + idx + 1;
+            });
+        }
+        updateVisibleCount();
+    }
+
+    function updateFilterIndicators() {
+        const headers = document.querySelectorAll('th[data-col]');
+        headers.forEach((header) => {
+            const col = header.dataset.col;
+            const active = window.__activeFilterState[col] && window.__activeFilterState[col].size > 0;
+            const btn = header.querySelector('[data-filter-btn]');
+            if (btn) {
+                btn.classList.remove('bg-white/20', 'text-yellow-200', 'ring-2', 'ring-yellow-300');
+                if (active) {
+                    btn.classList.add('bg-white/20', 'text-yellow-200', 'ring-2', 'ring-yellow-300');
+                }
+            }
+        });
     }
 
     function sortTable(col, direction) {
@@ -239,6 +302,118 @@
             return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
         });
         rows.forEach((row) => tbody.appendChild(row));
+        renumberRows();
+    }
+
+    function isFilterActive() {
+        return Object.values(window.__activeFilterState || {}).some((set) => set && set.size > 0);
+    }
+
+    function getVisibleRows() {
+        return Array.from(document.querySelectorAll('tbody tr[data-row]')).filter((r) => !r.classList.contains('hidden'));
+    }
+
+    function applyClientPaging() {
+        if (!isFilterActive()) return;
+        const rows = getVisibleRows();
+        const pageSize = window.__clientPageSize || rows.length || 1;
+        const page = Math.max(1, Math.min(window.__clientPage || 1, Math.ceil((rows.length || 1) / pageSize)));
+        window.__clientPage = page;
+        const start = (page - 1) * pageSize;
+        const end = start + pageSize;
+        rows.forEach((row, idx) => {
+            if (idx >= start && idx < end) {
+                row.classList.remove('hidden-by-page');
+            } else {
+                row.classList.add('hidden-by-page');
+            }
+        });
+        renumberRows();
+    }
+
+    function refreshPagination() {
+        const pageNumbers = document.getElementById('page-numbers');
+        const pageStatus = document.getElementById('page-status');
+        const pageSizeSelect = document.getElementById('page-size-select');
+        if (!pageNumbers || !pageStatus || !pageSizeSelect) return;
+
+        if (!isFilterActive()) {
+            // restore any option disabling
+            Array.from(pageSizeSelect.options).forEach((opt) => (opt.disabled = false));
+            pageSizeSelect.disabled = false;
+            return;
+        }
+
+        const rows = getVisibleRows();
+        const count = rows.length;
+        const allowedSizes = Array.from(pageSizeSelect.options).map((o) => parseInt(o.value, 10)).filter((v) => !isNaN(v));
+        let selectedSize = parseInt(pageSizeSelect.value, 10);
+        if (!selectedSize || selectedSize > count) {
+            selectedSize = count || allowedSizes[0] || 25;
+        }
+
+        // disable options larger than count
+        Array.from(pageSizeSelect.options).forEach((opt) => {
+            const val = parseInt(opt.value, 10);
+            opt.disabled = count > 0 ? val > count : false;
+        });
+        pageSizeSelect.value = selectedSize;
+        pageSizeSelect.disabled = count <= Math.min(...allowedSizes);
+
+        window.__clientPageSize = selectedSize;
+        const totalPages = Math.max(1, Math.ceil((count || 1) / selectedSize));
+        if (!window.__clientPage || window.__clientPage > totalPages) {
+            window.__clientPage = 1;
+        }
+
+        // rebuild page numbers
+        pageNumbers.innerHTML = "";
+        for (let p = 1; p <= totalPages; p++) {
+            const el = document.createElement(p === window.__clientPage ? 'span' : 'a');
+            el.textContent = p;
+            el.dataset.page = p;
+            el.className = p === window.__clientPage
+                ? "px-3 py-2 text-sm bg-blue-600 text-white rounded border border-blue-600 js-page-link"
+                : "px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link";
+            el.href = "#";
+            el.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                window.__clientPage = p;
+                applyClientPaging();
+                refreshPagination();
+            });
+            pageNumbers.appendChild(el);
+        }
+
+        // update status text
+        pageStatus.textContent = `Page ${window.__clientPage} of ${totalPages}`;
+
+        // update nav buttons
+        const navMap = {
+            first: 1,
+            prev: Math.max(1, window.__clientPage - 1),
+            next: Math.min(totalPages, window.__clientPage + 1),
+            last: totalPages,
+        };
+        document.querySelectorAll('.js-page-link[data-nav]').forEach((el) => {
+            const nav = el.dataset.nav;
+            const target = navMap[nav];
+            const disabled = (nav === 'first' && window.__clientPage === 1) ||
+                (nav === 'prev' && window.__clientPage === 1) ||
+                (nav === 'next' && window.__clientPage === totalPages) ||
+                (nav === 'last' && window.__clientPage === totalPages);
+            el.classList.toggle('pointer-events-none', disabled);
+            el.classList.toggle('opacity-50', disabled);
+            el.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                if (disabled) return;
+                window.__clientPage = target;
+                applyClientPaging();
+                refreshPagination();
+            });
+        });
+
+        applyClientPaging();
     }
 
     function persistColumnToggles() {
@@ -261,48 +436,68 @@
     }
 
     function initUI() {
-        window.__activeFilterState = window.__activeFilterState || {};
-        // restore toggle state
-        const saved = localStorage.getItem('columnToggles');
+        window.__activeFilterState = {};
+        // restore toggle state (default to on if missing)
+        const saved = localStorage.getItem('columnToggles_v2');
+        const toggles = Array.from(document.querySelectorAll('[data-toggle-col]'));
+        const defaultState = {};
+        const hiddenByDefault = ['disk_count', 'data_source', 'tags', 'manufacture', 'bios_version'];
+        toggles.forEach((t) => {
+            defaultState[t.dataset.toggleCol] = hiddenByDefault.includes(t.dataset.toggleCol) ? false : true;
+        });
+        let restored = { ...defaultState };
         if (saved) {
             try {
                 const state = JSON.parse(saved);
-                document.querySelectorAll('[data-toggle-col]').forEach((t) => {
-                    if (state.hasOwnProperty(t.dataset.toggleCol)) {
-                        t.checked = state[t.dataset.toggleCol];
-                    }
-                });
+                restored = { ...defaultState, ...state };
             } catch (e) {
                 console.warn('Could not parse column toggle state', e);
             }
         }
+        toggles.forEach((t) => {
+            if (restored.hasOwnProperty(t.dataset.toggleCol)) {
+                t.checked = restored[t.dataset.toggleCol];
+            }
+        });
         applyColumnToggles();
         attachTableReset();
         initColumnFilters();
+        updateFilterIndicators();
         // page size select submit form
         const pageSizeSelect = document.getElementById('page-size-select');
         if (pageSizeSelect) {
-            pageSizeSelect.addEventListener('change', () => {
-                const form = document.getElementById('filters');
-                if (form) form.submit();
+            pageSizeSelect.addEventListener('change', (e) => {
+                if (isFilterActive()) {
+                    window.__clientPageSize = parseInt(pageSizeSelect.value, 10) || window.__clientPageSize;
+                    window.__clientPage = 1;
+                    refreshPagination();
+                    applyClientPaging();
+                } else {
+                    const form = document.getElementById('filters');
+                    if (form) form.submit();
+                }
             });
         }
+        renumberRows();
+        refreshPagination();
     }
 
     document.addEventListener('change', (event) => {
         if (event.target.matches('[data-toggle-col]')) {
             applyColumnToggles();
+            if (isFilterActive()) {
+                window.__clientPage = 1;
+                refreshPagination();
+            }
         }
     });
 
     document.addEventListener('DOMContentLoaded', () => {
         initUI();
-        const pageSizeSelect = document.getElementById('page-size-select');
-        if (pageSizeSelect) {
-            pageSizeSelect.addEventListener('change', () => {
-                const form = document.getElementById('filters');
-                if (form) form.submit();
-            });
+    });
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+        if (e.target && e.target.id === 'server-table') {
+            initUI();
         }
     });
 
