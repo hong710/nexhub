@@ -1,48 +1,155 @@
 {% extends "base.html" %}
-{% block title %}Server {{ server.hostname }}{% endblock %}
+{% block title %}Server {{ server.hostname }} - NexHub{% endblock %}
 {% block content %}
-<div class="bg-white shadow rounded-xl border border-slate-200 p-6 space-y-4">
-    <div class="flex items-center justify-between">
-        <div>
-            <h1 class="text-2xl font-semibold text-slate-900">{{ server.hostname }}</h1>
-            <p class="text-sm text-slate-600">UUID: {{ server.uuid|default:"—" }}</p>
+<div class="bg-white h-full flex flex-col overflow-hidden rounded-lg border border-slate-200 shadow">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-blue-800" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="4" y="4" width="16" height="6" rx="1.5" ry="1.5"></rect>
+                <rect x="4" y="14" width="16" height="6" rx="1.5" ry="1.5"></rect>
+                <circle cx="8" cy="7" r="0.75"></circle>
+                <circle cx="8" cy="17" r="0.75"></circle>
+            </svg>
+            <div>
+                <h1 class="text-2xl font-semibold text-slate-900">{{ server.hostname }}</h1>
+                <p class="text-sm text-slate-600">UUID: {{ server.uuid|default:"—" }}</p>
+            </div>
         </div>
-        <a href="/" class="text-sm text-blue-700 hover:underline">← Back to servers</a>
+        <div class="flex items-center gap-2">
+            <a href="{% url 'overwatch:server_edit' server.pk %}" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300">Edit</a>
+            <form method="post" action="{% url 'overwatch:server_delete' server.pk %}" onsubmit="return confirm('Delete this server?');">
+                {% csrf_token %}
+                <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300">Delete</button>
+            </form>
+            <a href="{% url 'overwatch:server_list' %}" class="text-sm text-blue-700 hover:underline">Back to list</a>
+        </div>
     </div>
-    <div class="grid md:grid-cols-2 gap-6 text-sm">
-        <div class="space-y-2">
-            <h2 class="font-semibold text-slate-800">Network</h2>
-            <p><span class="font-medium">IP:</span> {{ server.ip_address|default:"—" }}</p>
-            <p><span class="font-medium">BMC IP:</span> {{ server.bmc_ip|default:"—" }}</p>
-            <p><span class="font-medium">NIC MAC:</span> {{ server.nic_mac|default:"—" }}</p>
-            <p><span class="font-medium">BMC MAC:</span> {{ server.bmc_mac|default:"—" }}</p>
+    <div class="p-6 overflow-auto space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">
+            <div><span class="font-semibold text-slate-700">IP:</span> {{ server.ip_address|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">BMC IP:</span> {{ server.bmc_ip|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">OS:</span> {{ server.os|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">OS Version:</span> {{ server.os_version|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Kernel:</span> {{ server.kernel|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">CPU:</span> {{ server.cpu|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Core Count:</span> {{ server.core_count|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Sockets:</span> {{ server.sockets|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Total Mem (GB):</span> {{ server.total_mem|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">BIOS Version:</span> {{ server.bios_version|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">BIOS Release:</span> {{ server.bios_release_date|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Manufacture:</span> {{ server.manufacture|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Product Name:</span> {{ server.product_name|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Platform:</span> {{ server.platform_display|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Room:</span> {{ server.room|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Rack:</span> {{ server.rack|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Location:</span> {{ server.location|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Building:</span> {{ server.building|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Status:</span> {{ server.get_status_display }}</div>
+            <div><span class="font-semibold text-slate-700">Assign To:</span> {{ server.assign_to|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Last Login:</span> {{ server.last_login|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Data Source:</span> {{ server.get_data_source_display|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">PDU Connection:</span> {{ server.pdu_connection|yesno:"Yes,No" }}</div>
+            <div><span class="font-semibold text-slate-700">PDU IP:</span> {{ server.pdu_ip|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">PDU Port:</span> {{ server.pdu_port_number|default:"—" }}</div>
+            <div><span class="font-semibold text-slate-700">Disk Count:</span> {{ server.disk_count|default:"—" }}</div>
         </div>
+
         <div class="space-y-2">
-            <h2 class="font-semibold text-slate-800">Hardware</h2>
-            <p><span class="font-medium">Manufacture:</span> {{ server.manufacture|default:"—" }}</p>
-            <p><span class="font-medium">Product Name:</span> {{ server.product_name|default:"—" }}</p>
-            <p><span class="font-medium">CPU:</span> {{ server.cpu|default:"—" }}</p>
-            <p><span class="font-medium">Core Count:</span> {{ server.core_count|default:"—" }}</p>
-            <p><span class="font-medium">Total Mem:</span> {{ server.total_mem|default:"—" }} GB</p>
-            <p><span class="font-medium">Disk Count:</span> {{ server.disk_count|default:"—" }}</p>
+            <h2 class="text-lg font-semibold text-slate-900">Tags</h2>
+            <div class="flex flex-wrap gap-2">
+                {% if server.tags.all|length %}
+                    {% for tag in server.tags.all %}
+                        <span class="inline-flex items-center px-2 py-1 rounded-full bg-blue-100 text-blue-800 border border-blue-200 text-[12px] font-medium">{{ tag.name }}</span>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-sm text-slate-600">No tags.</span>
+                {% endif %}
+            </div>
         </div>
-        <div class="space-y-2">
-            <h2 class="font-semibold text-slate-800">Software</h2>
-            <p><span class="font-medium">OS:</span> {{ server.os|default:"—" }}</p>
-            <p><span class="font-medium">OS Version:</span> {{ server.os_version|default:"—" }}</p>
-            <p><span class="font-medium">Kernel:</span> {{ server.kernel|default:"—" }}</p>
-            <p><span class="font-medium">BIOS Version:</span> {{ server.bios_version|default:"—" }}</p>
-            <p><span class="font-medium">BIOS Release:</span> {{ server.bios_release_date|default:"—" }}</p>
+
+        <div>
+            <h2 class="text-lg font-semibold text-slate-900 mb-2">Notes</h2>
+            <form method="post" action="{% url 'overwatch:server_note_create' server.pk %}" class="space-y-3 mb-4">
+                {% csrf_token %}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div class="md:col-span-2">
+                        {{ note_form.content }}
+                    </div>
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-slate-700">Priority</label>
+                        {{ note_form.priority }}
+                        <label class="inline-flex items-center gap-2 text-sm text-slate-700">
+                            {{ note_form.is_public }}
+                            <span>Public</span>
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center">
+                    Add note
+                </button>
+            </form>
+            <div class="space-y-3">
+                {% for note in notes %}
+                <div class="border border-slate-200 rounded-lg p-3 bg-slate-50">
+                    <div class="flex items-center justify-between text-sm text-slate-600">
+                        <span>Priority: <span class="font-semibold text-slate-800">{{ note.get_priority_display }}</span></span>
+                        <span>{{ note.created_at|date:"Y-m-d H:i" }}</span>
+                    </div>
+                    <p class="text-sm text-slate-800 mt-2">{{ note.content }}</p>
+                    <div class="text-xs text-slate-500 mt-1">Public: {{ note.is_public|yesno:"Yes,No" }}</div>
+                </div>
+                {% empty %}
+                <p class="text-sm text-slate-600">No notes yet.</p>
+                {% endfor %}
+            </div>
         </div>
-        <div class="space-y-2">
-            <h2 class="font-semibold text-slate-800">Location</h2>
-            <p><span class="font-medium">Building:</span> {{ server.building|default:"—" }}</p>
-            <p><span class="font-medium">Room:</span> {{ server.room|default:"—" }}</p>
-            <p><span class="font-medium">Rack:</span> {{ server.rack|default:"—" }}</p>
-            <p><span class="font-medium">Location:</span> {{ server.location|default:"—" }}</p>
-            <p><span class="font-medium">Status:</span> {{ server.status|default:"—" }}</p>
-            <p><span class="font-medium">Data Source:</span> {{ server.data_source|default:"—" }}</p>
-            <p><span class="font-medium">Tags:</span> {{ server.tags|default:"—" }}</p>
+
+        <div class="space-y-3">
+            <h2 class="text-lg font-semibold text-slate-900">Details (JSON)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">Memory details</div>
+                    {% if mem_details_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ mem_details_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">Disk details</div>
+                    {% if disk_details_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ disk_details_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">Accelerator</div>
+                    {% if accelerator_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ accelerator_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">Network interfaces</div>
+                    {% if network_interfaces_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ network_interfaces_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">Expansion slots</div>
+                    {% if expansion_slots_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ expansion_slots_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div>
+                    <div class="font-semibold text-slate-700 mb-1">User folders</div>
+                    {% if user_folders_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ user_folders_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+                <div class="md:col-span-2">
+                    <div class="font-semibold text-slate-700 mb-1">Misc</div>
+                    {% if misc_pretty %}
+                    <pre class="bg-slate-100 rounded p-3 text-xs text-slate-800 overflow-auto">{{ misc_pretty }}</pre>
+                    {% else %}<span class="text-slate-500">—</span>{% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>

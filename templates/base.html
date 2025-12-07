@@ -34,6 +34,7 @@
                         <a href="#" class="hover:text-blue-100">Subnets</a>
                         {% if request.user.is_staff %}
                         <a href="/dictionary/" class="hover:text-blue-100 {% if current == 'dictionary_list' %}font-semibold text-white underline underline-offset-4{% endif %}">Dictionary</a>
+                        <a href="/tags/" class="hover:text-blue-100 {% if current == 'tag_list' %}font-semibold text-white underline underline-offset-4{% endif %}">Tags</a>
                         {% endif %}
                     </div>
                     <div class="flex items-center gap-2">

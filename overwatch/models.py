@@ -59,6 +59,16 @@ NOTE_PRIORITY_CHOICES = [
 ]
 
 
+class Tag(BaseModel):
+    """Reusable tag for servers."""
+
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Server(BaseModel):
     # Basic Information
     uuid = models.CharField(max_length=36, unique=True, blank=True, null=True)
@@ -114,8 +124,10 @@ class Server(BaseModel):
     expansion_slots = models.JSONField(blank=True, null=True)
 
     # Monitoring & Management Flags
-    tags = models.CharField(max_length=255, blank=True, default="")
     pdu_connection = models.BooleanField(default=False)
+    tags = models.ManyToManyField(Tag, related_name="servers", blank=True)
+    pdu_ip = models.GenericIPAddressField(blank=True, null=True)
+    pdu_port_number = models.CharField(max_length=20, blank=True, null=True)
 
     # Data Source & Quality
     data_source = models.CharField(max_length=20, choices=DATA_SOURCE_CHOICES, blank=True, null=True)
