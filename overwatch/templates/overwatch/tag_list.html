@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}Tags - NexHub{% endblock %}
 {% block content %}
+{% url 'overwatch:tag_create' as tag_add_url %}
 <div class="bg-white h-full flex flex-col overflow-hidden">
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
         <div class="flex items-center gap-3 flex-wrap">
@@ -24,7 +25,7 @@
                     name="q"
                     value="{{ query }}"
                     placeholder="Search name or description"
-                    class="w-72 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+                    class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
                 />
                 <input type="hidden" name="page_size" value="{{ page_size }}">
                 <button
@@ -43,7 +44,7 @@
                 data-modal-target="tag-modal"
                 data-modal-toggle="tag-modal"
                 data-title="Add tag"
-                hx-get="{% url 'overwatch:tag_create' %}"
+                hx-get="{{ tag_add_url }}"
                 hx-target="#tag-modal-body"
                 hx-swap="innerHTML"
                 class="tag-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"

@@ -7,13 +7,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .models import (
-    DataDictionary,
-    DICTIONARY_CATEGORY_CHOICES,
-    Note,
-    Server,
-    Tag,
-)
+from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, Note, Server, Tag
 
 
 def pretty_json(value):
@@ -64,6 +58,10 @@ def server_list(request: HttpRequest) -> HttpResponse:
             search_filter |= Q(core_count=query) | Q(disk_count=query)
         servers = servers.filter(search_filter)
 
+    tags_filter = request.GET.getlist("tags")
+    if tags_filter:
+        servers = servers.filter(tags__name__in=tags_filter).distinct()
+
     servers = servers.order_by("hostname")
 
     page_size_input = request.GET.get("page_size")
@@ -89,6 +87,8 @@ def server_list(request: HttpRequest) -> HttpResponse:
     elided_pages = paginator.get_elided_page_range(number=page_obj.number, on_each_side=1, on_ends=1)
     page_offset = page_obj.start_index() - 1 if filtered_count else 0
 
+    tag_options = ["__NO_TAG__"] + list(Tag.objects.order_by("name").values_list("name", flat=True))
+
     for srv in page_obj:
         key = (srv.product_name or "").lower()
         srv.platform_display = platform_map.get(key) or srv.product_name
@@ -105,6 +105,7 @@ def server_list(request: HttpRequest) -> HttpResponse:
         ("core_count", "Core Count"),
         ("manufacture", "Manufacture"),
         ("product_name", "Product Name"),
+        ("category", "Device Type"),
         ("platform", "Platform"),
         ("bios_version", "BIOS Version"),
         ("room", "Room"),
@@ -137,6 +138,8 @@ def server_list(request: HttpRequest) -> HttpResponse:
         "total_all_count": total_all_count,
         "page_size_disabled": page_size_disabled,
         "page_offset": page_offset,
+        "tag_options": tag_options,
+        "tags_filter": tags_filter,
     }
 
     template = "overwatch/server_list_partial.html" if request.headers.get("HX-Request") else "overwatch/server_list.html"
@@ -226,6 +229,7 @@ def dictionary_list(request: HttpRequest) -> HttpResponse:
         "category": category_filter or "",
         "translate_from_filter": translate_from_filter or "",
         "translate_from_choices": translate_from_choices,
+        "category_choices": DICTIONARY_CATEGORY_CHOICES,
         "page_size": page_size,
         "page_sizes": page_sizes,
         "elided_pages": elided_pages,
@@ -242,6 +246,15 @@ def dictionary_list(request: HttpRequest) -> HttpResponse:
 
 
 class DictionaryForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        translate_choices = []
+        for f in Server._meta.fields:
+            if f.name in ["id", "created_at", "updated_at", "updated_by"]:
+                continue
+            translate_choices.append((f.name, f.verbose_name.title()))
+        self.fields["translate_from"].widget.choices = [("", "Select source")] + translate_choices
+
     class Meta:
         model = DataDictionary
         fields = ["translate_from", "original_keyword", "category", "standardized_value", "description", "is_active"]
@@ -275,9 +288,14 @@ def dictionary_create(request: HttpRequest) -> HttpResponse:
     else:
         form = DictionaryForm()
 
+    template = (
+        "overwatch/dictionary_form_inner.html"
+        if request.headers.get("HX-Request")
+        else "overwatch/dictionary_form.html"
+    )
     return render(
         request,
-        "overwatch/dictionary_form.html",
+        template,
         {
             "form": form,
             "form_title": "Add entry",
@@ -297,9 +315,14 @@ def dictionary_edit(request: HttpRequest, pk: int) -> HttpResponse:
     else:
         form = DictionaryForm(instance=entry)
 
+    template = (
+        "overwatch/dictionary_form_inner.html"
+        if request.headers.get("HX-Request")
+        else "overwatch/dictionary_form.html"
+    )
     return render(
         request,
-        "overwatch/dictionary_form.html",
+        template,
         {
             "form": form,
             "form_title": "Edit entry",
@@ -326,6 +349,17 @@ class TagForm(forms.ModelForm):
             ),
             "description": forms.Textarea(
                 attrs={"rows": 3, "class": "w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm"}
+            ),
+        }
+
+
+class CategoryForm(forms.ModelForm):
+    class Meta:
+        model = Category
+        fields = ["device_type"]
+        widgets = {
+            "device_type": forms.TextInput(
+                attrs={"class": "w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm"}
             ),
         }
 
@@ -416,6 +450,111 @@ def tag_delete(request: HttpRequest, pk: int) -> HttpResponse:
     return redirect("overwatch:tag_list")
 
 
+def category_list(request: HttpRequest) -> HttpResponse:
+    categories = Category.objects.all().order_by("device_type")
+    total_all_count = categories.count()
+    form = CategoryForm()
+
+    query = request.GET.get("q")
+    if query:
+        categories = categories.filter(device_type__icontains=query)
+
+    filtered_count = categories.count()
+
+    page_size_input = request.GET.get("page_size")
+    try:
+        page_size = int(page_size_input) if page_size_input else 25
+    except ValueError:
+        page_size = 25
+    if page_size not in [25, 50, 100, 200]:
+        page_size = 25
+
+    page_sizes = [25, 50, 100, 200]
+
+    paginator = Paginator(categories, page_size)
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+    elided_pages = paginator.get_elided_page_range(number=page_obj.number, on_each_side=1, on_ends=1)
+
+    context = {
+        "page_obj": page_obj,
+        "query": query or "",
+        "page_size": page_size,
+        "page_sizes": page_sizes,
+        "elided_pages": elided_pages,
+        "filtered_count": filtered_count,
+        "total_all_count": total_all_count,
+        "form": form,
+    }
+
+    template = (
+        "overwatch/category_list_partial.html"
+        if request.headers.get("HX-Request")
+        else "overwatch/category_list.html"
+    )
+    return render(request, template, context)
+
+
+def category_create(request: HttpRequest) -> HttpResponse:
+    if request.method == "POST":
+        form = CategoryForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect("overwatch:category_list")
+    else:
+        form = CategoryForm()
+
+    template = (
+        "overwatch/category_form_inner.html"
+        if request.headers.get("HX-Request")
+        else "overwatch/category_form.html"
+    )
+    return render(
+        request,
+        template,
+        {
+            "form": form,
+            "form_title": "Add category",
+            "submit_label": "Save",
+            "form_action": reverse("overwatch:category_create"),
+        },
+    )
+
+
+def category_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    category = get_object_or_404(Category, pk=pk)
+    if request.method == "POST":
+        form = CategoryForm(request.POST, instance=category)
+        if form.is_valid():
+            form.save()
+            return redirect("overwatch:category_list")
+    else:
+        form = CategoryForm(instance=category)
+
+    template = (
+        "overwatch/category_form_inner.html"
+        if request.headers.get("HX-Request")
+        else "overwatch/category_form.html"
+    )
+    return render(
+        request,
+        template,
+        {
+            "form": form,
+            "form_title": "Edit category",
+            "submit_label": "Update",
+            "form_action": reverse("overwatch:category_edit", args=[pk]),
+        },
+    )
+
+
+def category_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    category = get_object_or_404(Category, pk=pk)
+    if request.method == "POST":
+        category.delete()
+    return redirect("overwatch:category_list")
+
+
 class ServerForm(forms.ModelForm):
     tags = forms.ModelMultipleChoiceField(
         queryset=Tag.objects.order_by("name").distinct(),
@@ -426,6 +565,7 @@ class ServerForm(forms.ModelForm):
     class Meta:
         model = Server
         fields = [
+            "category",
             "hostname",
             "uuid",
             "ip_address",
@@ -458,6 +598,9 @@ class ServerForm(forms.ModelForm):
             "tags",
         ]
         widgets = {
+            "category": forms.Select(
+                attrs={"class": "w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm"}
+            ),
             "uuid": forms.TextInput(
                 attrs={"class": "w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-sm"}
             ),

@@ -51,6 +51,12 @@
                 </svg>
                 <span class="text-xs font-medium">Reset</span>
             </button>
+            <a
+                href="{% url 'overwatch:server_create' %}"
+                class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-700 border border-blue-700 text-white shadow-sm hover:bg-blue-800"
+            >
+                <span class="text-xs font-medium">+</span>
+            </a>
         </div>
     </div>
 
@@ -96,6 +102,7 @@
             const panel = header.querySelector(`[data-filter-panel="${col}"]`);
             const btn = header.querySelector(`[data-filter-btn="${col}"]`);
             if (!panel || !btn) return;
+            const tagOptions = header.dataset.tagOptions ? header.dataset.tagOptions.split(',').filter(Boolean) : null;
 
             const buildPanel = () => {
                 const visibleRows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter(
@@ -106,11 +113,20 @@
                         ? visibleRows.flatMap((tr) => Array.from(tr.querySelectorAll(`td[data-col="${col}"]`)))
                         : Array.from(document.querySelectorAll(`tbody td[data-col="${col}"]`));
 
-                const values = sourceCells
-                    .map((td) => td.textContent.trim())
-                    .filter((v) => v !== "");
-                const unique = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+                let values;
+                if (col === 'tags' && tagOptions) {
+                    values = tagOptions;
+                } else {
+                    values = sourceCells
+                        .map((td) => td.textContent.trim())
+                        .filter((v) => v !== "");
+                }
+                const unique = col === 'tags' && tagOptions
+                    ? Array.from(new Set(values))
+                    : Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
                 let working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+
+                const NO_TAG = "__NO_TAG__";
 
                 const renderList = (items) => {
                     return items
@@ -118,7 +134,7 @@
                             (val) => `
                             <label class="flex items-center gap-2 text-xs text-slate-700">
                                 <input type="checkbox" class="rounded border-slate-300" data-filter-checkbox="${col}" value="${val.replace(/"/g, "&quot;")}" ${working.has(val) ? "checked" : ""} />
-                                <span class="truncate" title="${val}">${val || "—"}</span>
+                                <span class="truncate" title="${val === NO_TAG ? "No tag" : val}">${val === NO_TAG ? "No tag" : (val || "—")}</span>
                             </label>
                         `
                         )
@@ -162,7 +178,10 @@
 
                 searchInput.addEventListener('input', () => {
                     const term = searchInput.value.toLowerCase();
-                    const filtered = unique.filter((v) => v.toLowerCase().includes(term));
+                    const filtered = unique.filter((v) => {
+                        const label = v === "__NO_TAG__" ? "No tag" : v;
+                        return label.toLowerCase().includes(term);
+                    });
                     listEl.innerHTML = renderList(filtered);
                 });
 
@@ -238,10 +257,23 @@
                     continue; // empty means no filter applied on this column
                 }
                 const cell = row.querySelector(`td[data-col="${col}"]`);
-                const cellVal = (cell?.textContent || "").trim();
-                if (!values.has(cellVal)) {
-                    visible = false;
-                    break;
+                if (!cell) continue;
+                if (col === 'tags') {
+                    const raw = cell.dataset.tags || "";
+                    const tagList = raw ? raw.split(',').map((t) => t.trim()).filter(Boolean) : [];
+                    const hasNoTagSelected = values.has("__NO_TAG__");
+                    const hasMatchTag = tagList.some((t) => values.has(t));
+                    const hasMatch = (hasNoTagSelected && tagList.length === 0) || hasMatchTag;
+                    if (!hasMatch) {
+                        visible = false;
+                        break;
+                    }
+                } else {
+                    const cellVal = (cell.textContent || "").trim();
+                    if (!values.has(cellVal)) {
+                        visible = false;
+                        break;
+                    }
                 }
             }
             row.classList.toggle('hidden', !visible);

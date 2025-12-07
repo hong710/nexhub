@@ -5,7 +5,7 @@
                 <tr>
                     <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 w-12">#</th>
                     {% for col, label in table_headers %}
-                    <th class="px-2 py-2 text-left font-semibold relative align-top border-r border-blue-900 last:border-r-0 {% if col in 'disk_count data_source tags product_name' %}hidden{% endif %} col-{{ col }} whitespace-nowrap" data-col="{{ col }}">
+                    <th class="px-2 py-2 text-left font-semibold relative align-top border-r border-blue-900 last:border-r-0 {% if col in 'disk_count data_source tags product_name' %}hidden{% endif %} col-{{ col }} whitespace-nowrap" data-col="{{ col }}"{% if col == 'tags' %} data-tag-options="{{ tag_options|join:',' }}"{% endif %}>
                         <div class="flex items-center justify-between gap-1">
                             <span class="inline-flex items-center gap-1">
                                 {{ label }}
@@ -45,6 +45,7 @@
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-core_count whitespace-nowrap" data-col="core_count">{{ server.core_count|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-manufacture whitespace-nowrap" data-col="manufacture">{{ server.manufacture|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-product_name whitespace-nowrap" data-col="product_name">{{ server.product_name|default:"—" }}</td>
+                    <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-category whitespace-nowrap" data-col="category">{{ server.category.device_type|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-platform whitespace-nowrap" data-col="platform">{{ server.platform_display|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-bios_version whitespace-nowrap" data-col="bios_version">{{ server.bios_version|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-room whitespace-nowrap" data-col="room">{{ server.room|default:"—" }}</td>
@@ -53,11 +54,11 @@
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-updated_at whitespace-nowrap" data-col="updated_at">{{ server.updated_at|date:"Y-m-d H:i" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="disk_count">{{ server.disk_count|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="data_source">{{ server.data_source|default:"—" }}</td>
-                    <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="tags">
+                    <td class="px-2 py-1.5 text-[12px] text-slate-700 hidden whitespace-nowrap" data-col="tags" data-tags="{{ server.tags_list|join:',' }}">
                         {% if server.tags_list %}
                             {% for trimmed in server.tags_list %}
                                 {% cycle 'bg-blue-100 text-blue-800 border-blue-200' 'bg-green-100 text-green-800 border-green-200' 'bg-purple-100 text-purple-800 border-purple-200' 'bg-amber-100 text-amber-800 border-amber-200' as tag_color silent %}
-                                <span class="inline-flex items-center px-2 py-0.5 mr-1 mb-1 rounded-full text-[11px] font-medium border {{ tag_color }}">{{ trimmed }}</span>
+                                <span class="inline-flex items-center px-1.5 py-0.5 mr-1 mb-1 rounded-full text-[10px] font-medium border {{ tag_color }}">{{ trimmed }}</span>
                             {% endfor %}
                         {% else %}
                             —

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}{{ form_title|default:"Category" }} - NexHub{% endblock %}
+{% block content %}
+<div class="bg-white h-full flex flex-col overflow-hidden rounded-lg border border-slate-200 shadow">
+    <div class="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+        <a href="{% url 'overwatch:category_list' %}" class="inline-flex items-center gap-2 text-blue-700 hover:underline text-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to list
+        </a>
+        <h1 class="text-lg font-semibold text-slate-900">{{ form_title|default:"Category" }}</h1>
+    </div>
+    <form method="post" action="{{ form_action|default:request.path }}" class="p-6 space-y-4">
+        {% csrf_token %}
+        {% include "overwatch/category_form_inner.html" %}
+        <div class="flex justify-end gap-2 pt-2">
+            <a href="{% url 'overwatch:category_list' %}" class="text-sm text-gray-700 hover:underline">Cancel</a>
+            <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center">
+                {{ submit_label|default:"Save" }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

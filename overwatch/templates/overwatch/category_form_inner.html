@@ -1,0 +1,9 @@
+<div class="grid grid-cols-1 gap-4">
+    <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Device Type</label>
+        {{ form.device_type }}
+        {% if form.device_type.errors %}
+            <p class="text-xs text-red-600 mt-1">{{ form.device_type.errors.0 }}</p>
+        {% endif %}
+    </div>
+</div>

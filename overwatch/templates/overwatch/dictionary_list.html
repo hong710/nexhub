@@ -66,21 +66,23 @@
                     Reset
                 </button>
             </form>
-            <a
-                href="#"
-                data-modal-target="dict-modal"
-                data-modal-toggle="dict-modal"
-                data-title="Add entry"
-                hx-get="{% url 'overwatch:dictionary_create' %}"
-                hx-target="#dict-modal-body"
-                hx-swap="innerHTML"
-                class="dict-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
-                </svg>
-                Add entry
-            </a>
+            <div class="flex items-center gap-2">
+                <a
+                    href="#"
+                    data-modal-target="dict-modal"
+                    data-modal-toggle="dict-modal"
+                    data-title="Add entry"
+                    hx-get="{% url 'overwatch:dictionary_create' %}"
+                    hx-target="#dict-modal-body"
+                    hx-swap="innerHTML"
+                    class="dict-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+                    </svg>
+                    Add entry
+                </a>
+            </div>
         </div>
     </div>
 

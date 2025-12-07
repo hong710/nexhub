@@ -59,6 +59,15 @@ NOTE_PRIORITY_CHOICES = [
 ]
 
 
+class Category(BaseModel):
+    """Device category for servers."""
+
+    device_type = models.CharField(max_length=100, unique=True)
+
+    def __str__(self) -> str:
+        return self.device_type
+
+
 class Tag(BaseModel):
     """Reusable tag for servers."""
 
@@ -128,6 +137,9 @@ class Server(BaseModel):
     tags = models.ManyToManyField(Tag, related_name="servers", blank=True)
     pdu_ip = models.GenericIPAddressField(blank=True, null=True)
     pdu_port_number = models.CharField(max_length=20, blank=True, null=True)
+
+    # Category
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, related_name="servers", blank=True, null=True)
 
     # Data Source & Quality
     data_source = models.CharField(max_length=20, choices=DATA_SOURCE_CHOICES, blank=True, null=True)
