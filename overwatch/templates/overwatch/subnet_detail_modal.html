@@ -1,0 +1,141 @@
+<div class="space-y-4">
+    <!-- Header -->
+    <div class="flex items-start justify-between pb-3 border-b border-slate-200">
+        <div>
+            <h2 class="text-2xl font-bold text-slate-900">{{ subnet.name }}</h2>
+            <p class="text-sm text-slate-500 mt-1">Subnet Details</p>
+        </div>
+        <div class="flex items-center gap-2">
+            {% if subnet.vlan_id %}
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-indigo-100 text-indigo-800">
+                VLAN {{ subnet.vlan_id }}
+            </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Network Information Card -->
+    <div class="bg-gradient-to-br from-cyan-50 to-blue-50 rounded-lg border border-cyan-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+            </svg>
+            Network Information
+        </h3>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <p class="text-xs text-slate-500 mb-1">Network (CIDR)</p>
+                <p class="text-sm font-mono font-semibold text-slate-800">{{ subnet.network }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-slate-500 mb-1">Gateway</p>
+                <p class="text-sm font-mono font-semibold text-slate-800">{{ subnet.gateway|default:"Not configured" }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- IP Statistics Card -->
+    <div class="bg-gradient-to-br from-emerald-50 to-green-50 rounded-lg border border-emerald-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-emerald-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            IP Address Statistics
+        </h3>
+        <div class="grid grid-cols-4 gap-4">
+            <div class="text-center">
+                <p class="text-2xl font-bold text-slate-800">{{ usable_ips }}</p>
+                <p class="text-xs text-slate-500 mt-1">Usable IPs</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold {% if available_ips == 0 %}text-red-600{% elif allocation_percentage > 80 %}text-amber-600{% else %}text-green-600{% endif %}">
+                    {{ available_ips }}
+                </p>
+                <p class="text-xs text-slate-500 mt-1">Available</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-purple-600">{{ static_ip_count }}</p>
+                <p class="text-xs text-slate-500 mt-1">Static Pool</p>
+            </div>
+            <div class="text-center">
+                <p class="text-2xl font-bold text-cyan-600">{{ dhcp_ip_count }}</p>
+                <p class="text-xs text-slate-500 mt-1">DHCP Pool</p>
+            </div>
+        </div>
+        
+        <!-- Allocation Progress Bar -->
+        <div class="mt-4">
+            <div class="flex items-center justify-between text-xs text-slate-600 mb-1">
+                <span>Allocation</span>
+                <span class="font-semibold">{{ allocation_percentage|floatformat:1 }}%</span>
+            </div>
+            <div class="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                <div class="h-full rounded-full transition-all {% if allocation_percentage > 90 %}bg-gradient-to-r from-red-500 to-red-600{% elif allocation_percentage > 80 %}bg-gradient-to-r from-amber-500 to-amber-600{% else %}bg-gradient-to-r from-green-500 to-green-600{% endif %}" style="width: {{ allocation_percentage }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Static IP Pools Card -->
+    {% if subnet.static_ip_pools %}
+    <div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-purple-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            Static IP Pools ({{ static_ip_count }} IPs)
+        </h3>
+        <div class="flex flex-wrap gap-2">
+            {% for pool in subnet.static_ip_pools %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
+                <span class="inline-block w-2 h-2 rounded-full bg-purple-500"></span>
+                {{ pool }}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 text-center">
+        <p class="text-sm text-slate-500">No static IP pools configured</p>
+    </div>
+    {% endif %}
+
+    <!-- DHCP Pools Card -->
+    {% if subnet.dhcp_pools %}
+    <div class="bg-gradient-to-br from-cyan-50 to-teal-50 rounded-lg border border-cyan-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-cyan-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+            DHCP Pools ({{ dhcp_ip_count }} IPs) - Auto-calculated
+        </h3>
+        <div class="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
+            {% for pool in subnet.dhcp_pools %}
+            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono bg-cyan-100 text-cyan-800 border border-cyan-200 shadow-sm">
+                <span class="inline-block w-2 h-2 rounded-full bg-cyan-500"></span>
+                {{ pool }}
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4 text-center">
+        <p class="text-sm text-slate-500">No DHCP pools available (all IPs allocated to static pool)</p>
+    </div>
+    {% endif %}
+
+    <!-- Description Card -->
+    {% if subnet.description %}
+    <div class="bg-slate-50 rounded-lg border border-slate-200 p-4">
+        <h3 class="text-sm font-semibold text-slate-700 mb-2">Description</h3>
+        <p class="text-sm text-slate-600">{{ subnet.description }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Metadata -->
+    <div class="text-xs text-slate-500 pt-3 border-t border-slate-200">
+        <div class="flex items-center justify-between">
+            <span>Created: {{ subnet.created_at|date:"Y-m-d H:i" }}</span>
+            <span>Updated: {{ subnet.updated_at|date:"Y-m-d H:i" }}</span>
+        </div>
+    </div>
+</div>

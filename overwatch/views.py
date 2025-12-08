@@ -9,7 +9,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
-from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, Note, Server, Tag
+from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, Note, Server, Subnet, Tag
 
 
 # =============================================================================
@@ -501,6 +501,165 @@ CATEGORY_CONFIG = CRUDConfig(
 )
 
 
+class SubnetForm(forms.ModelForm):
+    static_pools_input = forms.CharField(
+        required=False,
+        widget=forms.HiddenInput(),
+        label="Static IP Pools",
+    )
+
+    class Meta:
+        model = Subnet
+        fields = ["name", "network", "vlan_id", "gateway", "description"]
+        widgets = {
+            "name": forms.TextInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. Production LAN"}),
+            "network": forms.TextInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. 192.168.1.0/24"}),
+            "vlan_id": forms.NumberInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. 100", "min": "1", "max": "4094"}),
+            "gateway": forms.TextInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. 192.168.1.1"}),
+            "description": forms.Textarea(attrs={"rows": 3, "class": FORM_TEXTAREA_CLASS}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Prepare initial pools as JSON for the template
+        self.initial_pools_json = "[]"
+        if self.instance and self.instance.pk and self.instance.static_ip_pools:
+            import json
+            pools_data = []
+            for pool_str in self.instance.static_ip_pools:
+                if '-' in pool_str:
+                    start, end = pool_str.split('-')
+                    pools_data.append({"start": start.strip(), "end": end.strip()})
+            self.initial_pools_json = json.dumps(pools_data)
+
+    def clean_name(self):
+        name = self.cleaned_data.get("name")
+        if name:
+            qs = Subnet.objects.filter(name__iexact=name)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(f"A subnet with the name '{name}' already exists.")
+        return name
+
+    def clean_network(self):
+        """Validate CIDR network notation."""
+        import ipaddress as ip_lib
+        network = self.cleaned_data.get("network", "")
+        if network:
+            try:
+                ip_lib.ip_network(network, strict=False)
+            except ValueError:
+                raise forms.ValidationError("Invalid network format. Use CIDR notation, e.g. 192.168.1.0/24")
+        return network
+
+    def clean_gateway(self):
+        """Validate gateway IP address."""
+        gateway = self.cleaned_data.get("gateway", "")
+        if gateway and not validate_ip_address(gateway):
+            raise forms.ValidationError("Invalid gateway IP address format.")
+        return gateway
+
+    def clean_vlan_id(self):
+        """Validate VLAN ID range."""
+        vlan_id = self.cleaned_data.get("vlan_id")
+        if vlan_id is not None:
+            if vlan_id < 1 or vlan_id > 4094:
+                raise forms.ValidationError("VLAN ID must be between 1 and 4094.")
+        return vlan_id
+
+    def clean_static_pools_input(self):
+        """Validate and parse static IP pools from JSON data."""
+        import ipaddress as ip_lib
+        import json
+        
+        # Get the JSON data from the hidden field
+        static_pools_data = self.data.get("static_pools_data", "[]")
+        
+        try:
+            pools_list = json.loads(static_pools_data)
+        except json.JSONDecodeError:
+            raise forms.ValidationError("Invalid pool data format.")
+        
+        if not pools_list:
+            return []
+        
+        pools = []
+        for pool in pools_list:
+            start_ip = pool.get("start", "").strip()
+            end_ip = pool.get("end", "").strip()
+            
+            if not start_ip or not end_ip:
+                continue
+            
+            # Handle 0.0.0.0 case (all DHCP)
+            if start_ip == "0.0.0.0" and end_ip == "0.0.0.0":
+                continue  # Skip this, means no static pool
+            
+            try:
+                start = ip_lib.ip_address(start_ip)
+                end = ip_lib.ip_address(end_ip)
+                
+                if start > end:
+                    raise forms.ValidationError(f"Invalid range: {start_ip} → {end_ip}. Start IP must be less than or equal to end IP.")
+                
+                pools.append(f"{start}-{end}")
+            except ValueError as e:
+                raise forms.ValidationError(f"Invalid IP address: '{start_ip}' or '{end_ip}'. {str(e)}")
+        
+        return pools
+
+    def clean(self):
+        cleaned_data = super().clean()
+        network = cleaned_data.get("network")
+        static_pools = cleaned_data.get("static_pools_input", [])
+        gateway = cleaned_data.get("gateway")
+        
+        if network and static_pools:
+            # Verify all static IPs are within the subnet
+            import ipaddress as ip_lib
+            try:
+                net = ip_lib.ip_network(network, strict=False)
+                for pool_range in static_pools:
+                    start_ip, end_ip = pool_range.split('-')
+                    start = ip_lib.ip_address(start_ip.strip())
+                    end = ip_lib.ip_address(end_ip.strip())
+                    
+                    if start not in net or end not in net:
+                        raise forms.ValidationError(f"Static IP range {pool_range} is outside the subnet {network}")
+            except (ValueError, AttributeError) as e:
+                raise forms.ValidationError(f"Error validating static pools: {str(e)}")
+        
+        return cleaned_data
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        static_pools = self.cleaned_data.get("static_pools_input", [])
+        
+        # Save static pools
+        instance.static_ip_pools = static_pools if static_pools else None
+        
+        # Calculate and save DHCP pools
+        if instance.network:
+            instance.dhcp_pools = instance.calculate_dhcp_pools()
+        
+        if commit:
+            instance.save()
+        return instance
+
+
+SUBNET_CONFIG = CRUDConfig(
+    model=Subnet,
+    form_class=SubnetForm,
+    list_url_name="overwatch:subnet_list",
+    create_url_name="overwatch:subnet_create",
+    edit_url_name="overwatch:subnet_edit",
+    delete_url_name="overwatch:subnet_delete",
+    template_prefix="overwatch/subnet",
+    entity_name="subnet",
+)
+
+
 def tag_list(request: HttpRequest) -> HttpResponse:
     tags = Tag.objects.all().order_by("name")
     total_all_count = tags.count()
@@ -568,6 +727,77 @@ def category_edit(request: HttpRequest, pk: int) -> HttpResponse:
 
 def category_delete(request: HttpRequest, pk: int) -> HttpResponse:
     return generic_delete_view(request, pk, CATEGORY_CONFIG)
+
+
+def subnet_list(request: HttpRequest) -> HttpResponse:
+    subnets = Subnet.objects.all().order_by("name")
+    total_all_count = subnets.count()
+
+    query = request.GET.get("q")
+    if query:
+        subnets = subnets.filter(
+            Q(name__icontains=query)
+            | Q(network__icontains=query)
+            | Q(gateway__icontains=query)
+            | Q(description__icontains=query)
+        )
+
+    vlan_filter = request.GET.get("vlan")
+    if vlan_filter:
+        try:
+            subnets = subnets.filter(vlan_id=int(vlan_filter))
+        except ValueError:
+            pass
+
+    filtered_count = subnets.count()
+    pagination = paginate_queryset(subnets, request)
+
+    # Add IP calculations to each subnet
+    for subnet in pagination["page_obj"]:
+        subnet.usable_ips = subnet.get_usable_ips()
+        subnet.available_ips = subnet.get_available_ips()
+        subnet.allocation_percentage = subnet.get_allocation_percentage()
+        subnet.static_ip_count = subnet.get_static_ip_count()
+        subnet.dhcp_ip_count = subnet.get_dhcp_ip_count()
+
+    context = {
+        **pagination,
+        "query": query or "",
+        "vlan_filter": vlan_filter or "",
+        "filtered_count": filtered_count,
+        "total_all_count": total_all_count,
+    }
+
+    template = get_htmx_template(request, "overwatch/subnet_list_partial.html", "overwatch/subnet_list.html")
+    return render(request, template, context)
+
+
+def subnet_create(request: HttpRequest) -> HttpResponse:
+    return generic_create_view(request, SUBNET_CONFIG)
+
+
+def subnet_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    return generic_edit_view(request, pk, SUBNET_CONFIG)
+
+
+def subnet_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    return generic_delete_view(request, pk, SUBNET_CONFIG)
+
+
+def subnet_detail(request: HttpRequest, pk: int) -> HttpResponse:
+    """View subnet details in a modal."""
+    subnet = get_object_or_404(Subnet, pk=pk)
+    
+    context = {
+        "subnet": subnet,
+        "usable_ips": subnet.get_usable_ips(),
+        "available_ips": subnet.get_available_ips(),
+        "allocation_percentage": subnet.get_allocation_percentage(),
+        "static_ip_count": subnet.get_static_ip_count(),
+        "dhcp_ip_count": subnet.get_dhcp_ip_count(),
+    }
+    
+    return render(request, "overwatch/subnet_detail_modal.html", context)
 
 
 import re

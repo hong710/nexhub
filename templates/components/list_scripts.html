@@ -57,6 +57,16 @@ Required variables:
                     .then(response => response.text())
                     .then(html => {
                         modalBody.innerHTML = html;
+                        // Execute any inline scripts in the loaded content
+                        modalBody.querySelectorAll('script').forEach(oldScript => {
+                            const newScript = document.createElement('script');
+                            if (oldScript.src) {
+                                newScript.src = oldScript.src;
+                            } else {
+                                newScript.textContent = oldScript.textContent;
+                            }
+                            oldScript.parentNode.replaceChild(newScript, oldScript);
+                        });
                         // Tell HTMX to process the new content so hx-post works
                         if (window.htmx) {
                             window.htmx.process(modalBody);

@@ -1,0 +1,124 @@
+<div id="subnet-table" class="relative flex flex-col h-full overflow-hidden rounded-lg border border-slate-200 shadow-inner">
+    <div class="flex-1 overflow-auto min-h-0">
+        <table class="min-w-full table-auto text-sm text-left text-gray-700">
+            <thead class="text-xs uppercase bg-blue-800 text-white sticky top-0 z-30">
+                <tr>
+                    <th class="px-3 py-3 font-semibold align-top border-r border-blue-900 w-12">#</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap">Name</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap">Network</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap">VLAN ID</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap">Gateway</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap text-center">Usable IPs</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap text-center">Available IPs</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap text-center">Static Pool</th>
+                    <th class="px-4 py-3 font-semibold align-top border-r border-blue-900 whitespace-nowrap text-center">DHCP Pool</th>
+                    <th class="px-4 py-3 font-semibold align-top border-blue-900 whitespace-nowrap">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-gray-200">
+                {% for item in page_obj %}
+                <tr class="hover:bg-blue-50">
+                    <td class="px-3 py-2 text-[12px] text-slate-700 border-r border-slate-200 text-center w-12">
+                        {{ forloop.counter0|add:page_obj.start_index }}
+                    </td>
+                    <td class="px-4 py-2 text-[12px] border-r border-slate-200">
+                        <a 
+                            href="javascript:void(0)"
+                            data-subnet-id="{{ item.pk }}"
+                            class="subnet-detail-link font-semibold text-blue-700 hover:text-blue-900 hover:underline cursor-pointer"
+                        >
+                            {{ item.name }}
+                        </a>
+                    </td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200 font-mono">{{ item.network }}</td>
+                    <td class="px-4 py-2 text-[12px] text-slate-600 border-r border-slate-200 text-center">
+                        {% if item.vlan_id %}
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                            {{ item.vlan_id }}
+                        </span>
+                        {% else %}
+                        <span class="text-slate-400">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200 font-mono">{{ item.gateway|default:"—" }}</td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200 text-center font-semibold">
+                        {{ item.usable_ips|default:"0" }}
+                    </td>
+                    <td class="px-4 py-2 text-[12px] border-r border-slate-200 text-center">
+                        <div class="flex flex-col items-center gap-1">
+                            <span class="font-semibold {% if item.available_ips == 0 %}text-red-600{% elif item.allocation_percentage > 80 %}text-amber-600{% else %}text-green-600{% endif %}">
+                                {{ item.available_ips|default:"0" }}
+                            </span>
+                            {% if item.usable_ips > 0 %}
+                            <div class="w-16 bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                                <div class="h-full rounded-full {% if item.allocation_percentage > 90 %}bg-red-500{% elif item.allocation_percentage > 80 %}bg-amber-500{% else %}bg-green-500{% endif %}" style="width: {{ item.allocation_percentage }}%"></div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200">
+                        {% if item.static_ip_pools %}
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700 flex-shrink-0">
+                                {{ item.static_ip_count }} IPs
+                            </span>
+                            <div class="flex flex-wrap gap-1 flex-1 min-w-0">
+                                {% for pool in item.static_ip_pools %}
+                                <span class="inline-flex items-center gap-1 bg-purple-50 rounded px-2 py-0.5 border border-purple-100">
+                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                                    <span class="font-mono text-[11px] text-purple-800 whitespace-nowrap">{{ pool }}</span>
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <span class="text-slate-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200">
+                        {% if item.dhcp_pools %}
+                        <div class="flex items-center gap-2">
+                            <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-cyan-100 text-cyan-700 flex-shrink-0">
+                                {{ item.dhcp_ip_count }} IPs
+                            </span>
+                            <div class="flex flex-wrap gap-1 flex-1 min-w-0">
+                                {% for pool in item.dhcp_pools %}
+                                <span class="inline-flex items-center gap-1 bg-cyan-50 rounded px-2 py-0.5 border border-cyan-100">
+                                    <span class="inline-block w-1.5 h-1.5 rounded-full bg-cyan-500 flex-shrink-0"></span>
+                                    <span class="font-mono text-[11px] text-cyan-800 whitespace-nowrap">{{ pool }}</span>
+                                </span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% else %}
+                        <span class="text-slate-400 text-xs">—</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-2 text-[12px] text-blue-700 flex items-center gap-3">
+                        <a
+                            href="#"
+                            data-title="Edit subnet"
+                            data-form-url="{% url 'overwatch:subnet_edit' item.pk %}"
+                            class="subnet-modal-open font-medium text-blue-700 hover:underline"
+                        >Edit</a>
+                        <button
+                            type="button"
+                            class="font-medium text-red-600 hover:underline subnet-delete-btn"
+                            data-delete-url="{% url 'overwatch:subnet_delete' item.pk %}"
+                            data-label="{{ item.name }}"
+                        >
+                            Delete
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" class="px-3 py-4 text-center text-sm text-slate-600">No subnets found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% include "components/pagination.html" with prefix="subnet" %}
+</div>

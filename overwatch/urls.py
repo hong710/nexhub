@@ -25,4 +25,9 @@ urlpatterns = [
     path("categories/add/", views.category_create, name="category_create"),
     path("categories/<int:pk>/edit/", views.category_edit, name="category_edit"),
     path("categories/<int:pk>/delete/", views.category_delete, name="category_delete"),
+    path("subnets/", views.subnet_list, name="subnet_list"),
+    path("subnets/<int:pk>/", views.subnet_detail, name="subnet_detail"),
+    path("subnets/add/", views.subnet_create, name="subnet_create"),
+    path("subnets/<int:pk>/edit/", views.subnet_edit, name="subnet_edit"),
+    path("subnets/<int:pk>/delete/", views.subnet_delete, name="subnet_delete"),
 ]

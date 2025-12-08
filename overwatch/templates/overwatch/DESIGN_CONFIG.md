@@ -317,3 +317,183 @@ Follow the same pattern as `dictionary_create`, `dictionary_edit`, `dictionary_d
 - [ ] Form styling matches
 - [ ] Colors follow the defined palette
 - [ ] Typography follows the standards
+
+---
+
+## 11. Detail Modal Pattern
+
+For entities that need a detail view modal (e.g., Subnet, Server):
+
+### Structure
+```html
+<!-- Detail Modal -->
+<div id="{prefix}-detail-modal" tabindex="-1" aria-hidden="true" 
+     class="hidden overflow-y-auto overflow-x-hidden fixed inset-0 z-50 flex justify-center items-center w-full h-full bg-gray-900/50">
+    <div class="relative p-4 w-full max-w-4xl max-h-full">
+        <div class="relative bg-white rounded-lg shadow-sm">
+            <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t border-gray-200">
+                <h3 class="text-xl font-semibold text-gray-900">{Entity} Details</h3>
+                <button type="button" onclick="close{Entity}DetailModal()" class="...">Close</button>
+            </div>
+            <div id="{prefix}-detail-content" class="p-4 md:p-5">
+                <!-- Detail content loaded via fetch -->
+            </div>
+        </div>
+    </div>
+</div>
+```
+
+### JavaScript for Detail Modal
+```javascript
+function init{Entity}DetailLinks() {
+    document.querySelectorAll('.{prefix}-detail-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const id = this.dataset.{prefix}Id;
+            if (id) {
+                fetch('/{entities}/' + id + '/')
+                    .then(response => response.text())
+                    .then(html => {
+                        document.getElementById('{prefix}-detail-content').innerHTML = html;
+                        const modal = document.getElementById('{prefix}-detail-modal');
+                        modal.classList.remove('hidden');
+                        modal.classList.add('flex');
+                    });
+            }
+        });
+    });
+}
+```
+
+---
+
+## 12. Dynamic Form Fields Pattern
+
+For forms with dynamic input fields (e.g., IP Pool ranges):
+
+### Structure
+```html
+<!-- Dynamic Fields Container -->
+<div>
+    <label class="block text-sm font-medium text-slate-700 mb-1">Field Label</label>
+    
+    <!-- Usage Hints Box -->
+    <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+        <p class="font-semibold mb-1">💡 How to use:</p>
+        <ul class="list-disc list-inside space-y-0.5">
+            <li><strong>Option 1:</strong> Description...</li>
+            <li><strong>Option 2:</strong> Description...</li>
+        </ul>
+    </div>
+    
+    <!-- Hidden field for JSON data -->
+    <input type="hidden" name="field_data" id="field-data" value="{{ form.initial_data_json|default:'[]' }}">
+    
+    <!-- Dynamic rows container -->
+    <div id="field-container" class="space-y-2 mb-2"></div>
+    
+    <!-- Add button -->
+    <button type="button" id="add-field-btn" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200">
+        <svg class="w-3 h-3 mr-1"><!-- Plus icon --></svg>
+        Add Item
+    </button>
+</div>
+```
+
+### JavaScript for Dynamic Fields
+```javascript
+// Execute scripts loaded via innerHTML
+modalBody.querySelectorAll('script').forEach(oldScript => {
+    const newScript = document.createElement('script');
+    if (oldScript.src) {
+        newScript.src = oldScript.src;
+    } else {
+        newScript.textContent = oldScript.textContent;
+    }
+    oldScript.parentNode.replaceChild(newScript, oldScript);
+});
+```
+
+---
+
+## 13. Tag-Style Display Pattern
+
+For displaying lists as tags/chips:
+
+### Static IP Pools (Purple Theme)
+```html
+<div class="flex flex-wrap gap-2">
+    {% for item in items %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
+        <span class="inline-block w-2 h-2 rounded-full bg-purple-500"></span>
+        {{ item }}
+    </span>
+    {% endfor %}
+</div>
+```
+
+### DHCP Pools (Cyan Theme)
+```html
+<div class="flex flex-wrap gap-2">
+    {% for item in items %}
+    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono bg-cyan-100 text-cyan-800 border border-cyan-200 shadow-sm">
+        <span class="inline-block w-2 h-2 rounded-full bg-cyan-500"></span>
+        {{ item }}
+    </span>
+    {% endfor %}
+</div>
+```
+
+### Color Themes for Tags
+| Type | Background | Text | Border | Dot |
+|------|------------|------|--------|-----|
+| Purple (Static) | `bg-purple-100` | `text-purple-800` | `border-purple-200` | `bg-purple-500` |
+| Cyan (DHCP) | `bg-cyan-100` | `text-cyan-800` | `border-cyan-200` | `bg-cyan-500` |
+| Indigo (VLAN) | `bg-indigo-100` | `text-indigo-800` | `border-indigo-200` | `bg-indigo-500` |
+| Green (Success) | `bg-green-100` | `text-green-700` | `border-green-200` | `bg-green-500` |
+| Red (Error) | `bg-red-100` | `text-red-700` | `border-red-200` | `bg-red-500` |
+
+---
+
+## 14. IP/Network Display Patterns
+
+### In Table Cells
+```html
+<td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200">
+    {% if item.pools %}
+    <div class="flex items-center gap-2">
+        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-100 text-purple-700 flex-shrink-0">
+            {{ item.ip_count }} IPs
+        </span>
+        <div class="flex flex-wrap gap-1 flex-1 min-w-0">
+            {% for pool in item.pools %}
+            <span class="inline-flex items-center gap-1 bg-purple-50 rounded px-2 py-0.5 border border-purple-100">
+                <span class="inline-block w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0"></span>
+                <span class="font-mono text-[11px] text-purple-800 whitespace-nowrap">{{ pool }}</span>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <span class="text-slate-400 text-xs">—</span>
+    {% endif %}
+</td>
+```
+
+### In Detail Modal Cards
+```html
+<div class="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg border border-purple-200 p-4">
+    <h3 class="text-sm font-semibold text-slate-700 mb-3 flex items-center gap-2">
+        <svg class="h-4 w-4 text-purple-600"><!-- Icon --></svg>
+        Static IP Pools ({{ count }} IPs)
+    </h3>
+    <div class="flex flex-wrap gap-2">
+        {% for pool in pools %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-mono bg-purple-100 text-purple-800 border border-purple-200 shadow-sm">
+            <span class="inline-block w-2 h-2 rounded-full bg-purple-500"></span>
+            {{ pool }}
+        </span>
+        {% endfor %}
+    </div>
+</div>
+```

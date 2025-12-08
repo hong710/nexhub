@@ -157,9 +157,138 @@ class Subnet(BaseModel):
     vlan_id = models.PositiveIntegerField(blank=True, null=True)
     gateway = models.GenericIPAddressField(blank=True, null=True)
     description = models.TextField(blank=True, null=True)
+    static_ip_pools = models.JSONField(blank=True, null=True, help_text="List of static IP ranges, e.g. ['10.0.1.1-10.0.1.50']")
+    dhcp_pools = models.JSONField(blank=True, null=True, help_text="List of DHCP IP ranges (auto-calculated)")
 
     def __str__(self) -> str:
         return f"{self.name} ({self.network})"
+
+    def get_usable_ips(self) -> int:
+        """Calculate total usable IPs in the subnet."""
+        try:
+            import ipaddress as ip_lib
+            net = ip_lib.ip_network(self.network, strict=False)
+            # Usable IPs = total IPs - network address - broadcast address
+            return net.num_addresses - 2 if net.num_addresses > 2 else 0
+        except (ValueError, AttributeError):
+            return 0
+
+    def get_available_ips(self) -> int:
+        """Calculate available IPs (not allocated in IPAM)."""
+        try:
+            import ipaddress as ip_lib
+            net = ip_lib.ip_network(self.network, strict=False)
+            # Get all IPs in the subnet (excluding network and broadcast)
+            all_ips = set(str(ip) for ip in net.hosts())
+            # Get allocated IPs from IPAM
+            allocated_ips = set(self.ip_addresses.filter(active=True).values_list('ip_address', flat=True))
+            # Available = usable - allocated
+            return len(all_ips - allocated_ips)
+        except (ValueError, AttributeError):
+            return 0
+
+    def get_allocation_percentage(self) -> float:
+        """Calculate the percentage of IPs allocated."""
+        usable = self.get_usable_ips()
+        if usable == 0:
+            return 0.0
+        available = self.get_available_ips()
+        allocated = usable - available
+        return (allocated / usable) * 100
+
+    def calculate_dhcp_pools(self) -> list[str]:
+        """Calculate DHCP pools based on static IP pools and network range."""
+        try:
+            import ipaddress as ip_lib
+            net = ip_lib.ip_network(self.network, strict=False)
+            all_ips = set(net.hosts())
+            
+            # Parse static IP pools and collect all static IPs
+            static_ips = set()
+            if self.static_ip_pools:
+                for pool_range in self.static_ip_pools:
+                    if '-' in pool_range:
+                        start_ip, end_ip = pool_range.split('-')
+                        start_ip = ip_lib.ip_address(start_ip.strip())
+                        end_ip = ip_lib.ip_address(end_ip.strip())
+                        # Add all IPs in the range
+                        current = start_ip
+                        while current <= end_ip:
+                            static_ips.add(current)
+                            current += 1
+            
+            # DHCP pool = all usable IPs - static IPs - gateway
+            dhcp_ips = all_ips - static_ips
+            if self.gateway:
+                try:
+                    dhcp_ips.discard(ip_lib.ip_address(self.gateway))
+                except ValueError:
+                    pass
+            
+            # Convert to sorted list and create ranges
+            if not dhcp_ips:
+                return []
+            
+            sorted_ips = sorted(list(dhcp_ips))
+            ranges = []
+            start = sorted_ips[0]
+            prev = sorted_ips[0]
+            
+            for ip in sorted_ips[1:]:
+                if int(ip) - int(prev) > 1:
+                    # Gap found, close current range
+                    if start == prev:
+                        ranges.append(str(start))
+                    else:
+                        ranges.append(f"{start}-{prev}")
+                    start = ip
+                prev = ip
+            
+            # Close last range
+            if start == prev:
+                ranges.append(str(start))
+            else:
+                ranges.append(f"{start}-{prev}")
+            
+            return ranges
+        except (ValueError, AttributeError, TypeError):
+            return []
+
+    def get_static_ip_count(self) -> int:
+        """Count total IPs in static pools."""
+        if not self.static_ip_pools:
+            return 0
+        try:
+            import ipaddress as ip_lib
+            count = 0
+            for pool_range in self.static_ip_pools:
+                if '-' in pool_range:
+                    start_ip, end_ip = pool_range.split('-')
+                    start = ip_lib.ip_address(start_ip.strip())
+                    end = ip_lib.ip_address(end_ip.strip())
+                    count += int(end) - int(start) + 1
+            return count
+        except (ValueError, AttributeError, TypeError):
+            return 0
+
+    def get_dhcp_ip_count(self) -> int:
+        """Count total IPs in DHCP pools."""
+        if not self.dhcp_pools:
+            return 0
+        try:
+            import ipaddress as ip_lib
+            count = 0
+            for pool_range in self.dhcp_pools:
+                if '-' in pool_range:
+                    start_ip, end_ip = pool_range.split('-')
+                    start = ip_lib.ip_address(start_ip.strip())
+                    end = ip_lib.ip_address(end_ip.strip())
+                    count += int(end) - int(start) + 1
+                else:
+                    count += 1
+            return count
+        except (ValueError, AttributeError, TypeError):
+            return 0
 
 
 class IPAM(BaseModel):

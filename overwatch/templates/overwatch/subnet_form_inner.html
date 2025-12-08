@@ -1,0 +1,282 @@
+<div class="space-y-4">
+    {% if form.non_field_errors %}
+    <div class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+        {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <form 
+        method="post" 
+        action="{{ form_action|default:request.path }}" 
+        class="space-y-4"
+        hx-post="{{ form_action|default:request.path }}"
+        hx-target="#subnet-modal-body"
+        hx-swap="innerHTML"
+        id="subnet-form"
+    >
+        {% csrf_token %}
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Subnet Name <span class="text-red-500">*</span></label>
+                {{ form.name }}
+                {% if form.name.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.name.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Network (CIDR) <span class="text-red-500">*</span></label>
+                {{ form.network }}
+                {% if form.network.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.network.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">VLAN ID</label>
+                {{ form.vlan_id }}
+                {% if form.vlan_id.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.vlan_id.errors.0 }}</p>
+                {% endif %}
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Gateway</label>
+                {{ form.gateway }}
+                {% if form.gateway.errors %}
+                    <p class="text-xs text-red-600 mt-1">{{ form.gateway.errors.0 }}</p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Static IP Pools - Dynamic Fields -->
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Static IP Pools</label>
+            
+            <!-- Usage hints -->
+            <div class="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800">
+                <p class="font-semibold mb-1">💡 How to use:</p>
+                <ul class="list-disc list-inside space-y-0.5">
+                    <li><strong>IP Range:</strong> Enter start IP in "From" and end IP in "To" (e.g., 10.0.1.1 → 10.0.1.50)</li>
+                    <li><strong>Single IP:</strong> Enter the same IP in both "From" and "To" (e.g., 10.0.1.100 → 10.0.1.100)</li>
+                    <li><strong>All DHCP:</strong> Leave empty or enter 0.0.0.0 in both fields to use entire subnet as DHCP</li>
+                </ul>
+            </div>
+            
+            <!-- Hidden field to store the pools data -->
+            <input type="hidden" name="static_pools_data" id="static-pools-data" value="{{ form.initial_pools_json|default:'[]' }}">
+            
+            <!-- Dynamic pool rows container -->
+            <div id="static-pools-container" class="space-y-2 mb-2">
+                <!-- Rows will be added here by JavaScript -->
+            </div>
+            
+            <!-- Add Range button -->
+            <button type="button" id="add-pool-btn" class="inline-flex items-center px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 rounded hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-300">
+                <svg class="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                    <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                </svg>
+                Add Range
+            </button>
+            
+            {% if form.static_pools_input.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.static_pools_input.errors.0 }}</p>
+            {% endif %}
+        </div>
+        
+        <div>
+            <label class="block text-sm font-medium text-slate-700 mb-1">Description</label>
+            {{ form.description }}
+            {% if form.description.errors %}
+                <p class="text-xs text-red-600 mt-1">{{ form.description.errors.0 }}</p>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-3 pt-2">
+            <button type="submit" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-4 py-2 text-center">
+                {{ submit_label|default:"Save" }}
+            </button>
+            <button type="button" data-modal-hide="subnet-modal" class="text-sm text-gray-700 hover:underline">Cancel</button>
+        </div>
+    </form>
+</div>
+
+<script>
+(function() {
+    var container = document.getElementById('static-pools-container');
+    var hiddenInput = document.getElementById('static-pools-data');
+    var addBtn = document.getElementById('add-pool-btn');
+    
+    if (!container || !hiddenInput || !addBtn) {
+        console.error('Static pools elements not found');
+        return;
+    }
+    
+    // Parse initial data
+    var pools = [];
+    try {
+        pools = JSON.parse(hiddenInput.value || '[]');
+    } catch (e) {
+        pools = [];
+    }
+    
+    // Render initial pools or add one empty row
+    if (pools.length === 0) {
+        addPoolRow('', '');
+    } else {
+        for (var i = 0; i < pools.length; i++) {
+            var pool = pools[i];
+            if (pool.start && pool.end) {
+                addPoolRow(pool.start, pool.end);
+            }
+        }
+    }
+    
+    // Add button handler
+    addBtn.onclick = function() {
+        addPoolRow('', '');
+    };
+    
+    function addPoolRow(startIP, endIP) {
+        const row = document.createElement('div');
+        row.className = 'pool-row flex items-center gap-2';
+        row.innerHTML = `
+            <div class="flex-1">
+                <input type="text" 
+                       class="pool-start block w-full p-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500" 
+                       placeholder="From IP (e.g., 10.0.1.1)"
+                       value="${escapeHtml(startIP)}"
+                       pattern="^(\\d{1,3}\\.){3}\\d{1,3}$">
+            </div>
+            <span class="text-slate-500 text-sm font-medium">→</span>
+            <div class="flex-1">
+                <input type="text" 
+                       class="pool-end block w-full p-2 text-sm border border-gray-300 rounded-lg bg-gray-50 focus:ring-blue-500 focus:border-blue-500" 
+                       placeholder="To IP (e.g., 10.0.1.50)"
+                       value="${escapeHtml(endIP)}"
+                       pattern="^(\\d{1,3}\\.){3}\\d{1,3}$">
+            </div>
+            <button type="button" class="remove-pool-btn p-1.5 text-red-600 hover:text-red-800 hover:bg-red-100 rounded focus:outline-none" title="Remove this range">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                </svg>
+            </button>
+        `;
+        
+        container.appendChild(row);
+        
+        // Attach event listeners
+        row.querySelector('.remove-pool-btn').addEventListener('click', function() {
+            if (container.querySelectorAll('.pool-row').length > 1) {
+                row.remove();
+                updateHiddenField();
+            } else {
+                // Clear the last row instead of removing
+                row.querySelector('.pool-start').value = '';
+                row.querySelector('.pool-end').value = '';
+                updateHiddenField();
+            }
+        });
+        
+        row.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', function() {
+                validateRow(row);
+                updateHiddenField();
+            });
+            input.addEventListener('blur', function() {
+                validateRow(row);
+            });
+        });
+        
+        updateHiddenField();
+    }
+    
+    function validateRow(row) {
+        const startInput = row.querySelector('.pool-start');
+        const endInput = row.querySelector('.pool-end');
+        const startIP = startInput.value.trim();
+        const endIP = endInput.value.trim();
+        
+        // Reset styles
+        startInput.classList.remove('border-red-500', 'bg-red-50');
+        endInput.classList.remove('border-red-500', 'bg-red-50');
+        
+        if (!startIP && !endIP) return true; // Empty row is valid
+        
+        // Validate IP format
+        const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+        let valid = true;
+        
+        if (startIP && !ipPattern.test(startIP)) {
+            startInput.classList.add('border-red-500', 'bg-red-50');
+            valid = false;
+        } else if (startIP) {
+            // Check valid octets
+            const octets = startIP.split('.').map(Number);
+            if (octets.some(o => o > 255)) {
+                startInput.classList.add('border-red-500', 'bg-red-50');
+                valid = false;
+            }
+        }
+        
+        if (endIP && !ipPattern.test(endIP)) {
+            endInput.classList.add('border-red-500', 'bg-red-50');
+            valid = false;
+        } else if (endIP) {
+            // Check valid octets
+            const octets = endIP.split('.').map(Number);
+            if (octets.some(o => o > 255)) {
+                endInput.classList.add('border-red-500', 'bg-red-50');
+                valid = false;
+            }
+        }
+        
+        // Check start <= end
+        if (valid && startIP && endIP && startIP !== '0.0.0.0') {
+            const startNum = ipToNumber(startIP);
+            const endNum = ipToNumber(endIP);
+            if (startNum > endNum) {
+                startInput.classList.add('border-red-500', 'bg-red-50');
+                endInput.classList.add('border-red-500', 'bg-red-50');
+                valid = false;
+            }
+        }
+        
+        return valid;
+    }
+    
+    function ipToNumber(ip) {
+        const parts = ip.split('.').map(Number);
+        return (parts[0] << 24) + (parts[1] << 16) + (parts[2] << 8) + parts[3];
+    }
+    
+    function updateHiddenField() {
+        const rows = container.querySelectorAll('.pool-row');
+        const data = [];
+        
+        rows.forEach(row => {
+            const startIP = row.querySelector('.pool-start').value.trim();
+            const endIP = row.querySelector('.pool-end').value.trim();
+            
+            if (startIP && endIP) {
+                data.push({ start: startIP, end: endIP });
+            }
+        });
+        
+        hiddenInput.value = JSON.stringify(data);
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // Update hidden field before form submit
+    var subnetForm = document.getElementById('subnet-form');
+    if (subnetForm) {
+        subnetForm.addEventListener('submit', function() {
+            updateHiddenField();
+        });
+    }
+})();
+</script>
