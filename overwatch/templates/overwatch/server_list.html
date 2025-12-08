@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Servers - NexHub{% endblock %}
 {% block content %}
-<div class="bg-white h-full flex flex-col overflow-hidden">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
+<div class="bg-white flex-1 flex flex-col overflow-hidden min-h-0">
+    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2 flex-shrink-0">
         <div class="flex items-center gap-3 flex-wrap">
             <div class="flex items-center gap-2 text-blue-900">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -16,10 +16,10 @@
             <form
                 id="filters"
                 hx-get="."
-                hx-target="#server-table"
+                hx-target="#server-table-wrapper"
                 hx-trigger="keyup changed delay:250ms from:#search, submit"
                 hx-include="#page-size-select"
-                hx-swap="outerHTML"
+                hx-swap="innerHTML"
                 class="flex items-center gap-2"
             >
                 <input
@@ -60,9 +60,9 @@
         </div>
     </div>
 
-    <div class="h-3"></div>
+    <div class="h-3 flex-shrink-0"></div>
 
-    <div id="server-table" class="flex-1 overflow-hidden min-h-0 px-0">
+    <div id="server-table-wrapper" class="flex-1 overflow-hidden min-h-0 px-0">
         {% include "overwatch/server_list_partial.html" %}
     </div>
 </div>
@@ -528,7 +528,7 @@
         initUI();
     });
     document.body.addEventListener('htmx:afterSwap', (e) => {
-        if (e.target && e.target.id === 'server-table') {
+        if (e.target && e.target.id === 'server-table-wrapper') {
             initUI();
         }
     });

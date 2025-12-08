@@ -1,233 +1,100 @@
-{% extends "base.html" %}
-{% block title %}Dictionary - NexHub{% endblock %}
-{% block content %}
-<div class="bg-white h-full flex flex-col overflow-hidden">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
-        <div class="flex items-center gap-3 flex-wrap">
-            <div class="flex items-center gap-2 text-blue-900">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path d="M5 4h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
-                    <path d="M5 10h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z" />
-                    <path d="M5 16h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V17a1 1 0 0 1 1-1z" />
-                </svg>
-                <h1 class="text-2xl font-semibold text-slate-900">Dictionary</h1>
-            </div>
-            <form
-                id="dict-filters"
-                hx-get="."
-                hx-target="#dictionary-table"
-                hx-trigger="keyup changed delay:250ms from:#dict-search, change from:.dict-filter-select, submit"
-                hx-swap="outerHTML"
-                class="flex items-center gap-2 flex-wrap"
-            >
-                <input
-                    id="dict-search"
-                    type="search"
-                    name="q"
-                    value="{{ query }}"
-                    placeholder="Search keywords, values, categories"
-                    class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input type="hidden" name="page_size" value="{{ page_size }}">
-                <select
-                    name="translate_from"
-                    class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="">Translate From</option>
-                    {% for key,label in translate_from_choices %}
-                        <option value="{{ key }}" {% if translate_from_filter == key %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <select
-                    name="category"
-                    class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="">Translate To</option>
-                    {% for key,label in category_choices %}
-                        <option value="{{ key }}" {% if category_filter == key %}selected{% endif %}>{{ label }}</option>
-                    {% endfor %}
-                </select>
-                <select
-                    name="active"
-                    class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                >
-                    <option value="">All statuses</option>
-                    <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
-                    <option value="false" {% if active_filter == 'false' %}selected{% endif %}>Inactive</option>
-                </select>
-                <button
-                    type="button"
-                    id="dict-reset"
-                    class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
-                    </svg>
-                    Reset
-                </button>
-            </form>
-            <div class="flex items-center gap-2">
-                <a
-                    href="#"
-                    data-modal-target="dict-modal"
-                    data-modal-toggle="dict-modal"
-                    data-title="Add entry"
-                    hx-get="{% url 'overwatch:dictionary_create' %}"
-                    hx-target="#dict-modal-body"
-                    hx-swap="innerHTML"
-                    class="dict-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
-                    </svg>
-                    Add entry
-                </a>
-            </div>
-        </div>
-    </div>
+{% extends "components/list_page.html" %}
+{% block page_title %}Dictionary - NexHub{% endblock %}
 
-    <div class="h-3"></div>
+{% block list_icon %}
+<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path d="M5 4h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" />
+    <path d="M5 10h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V11a1 1 0 0 1 1-1z" />
+    <path d="M5 16h14a1 1 0 0 1 1 1v2.5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V17a1 1 0 0 1 1-1z" />
+</svg>
+{% endblock %}
 
-    <div id="dictionary-table" class="flex-1 overflow-hidden min-h-0 px-0">
-        {% include "overwatch/dictionary_list_partial.html" %}
-    </div>
+{% block list_heading %}Dictionary{% endblock %}
+
+{% block list_filters %}
+<form
+    id="dict-filters"
+    hx-get="."
+    hx-target="#dictionary-table"
+    hx-trigger="keyup changed delay:250ms from:#dict-search, change from:.dict-filter-select, submit"
+    hx-swap="outerHTML"
+    class="flex items-center gap-2 flex-wrap"
+>
+    <input
+        id="dict-search"
+        type="search"
+        name="q"
+        value="{{ query }}"
+        placeholder="Search keywords, values, categories"
+        class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    />
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <select
+        name="translate_from"
+        class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    >
+        <option value="">Translate From</option>
+        {% for key,label in translate_from_choices %}
+            <option value="{{ key }}" {% if translate_from_filter == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select
+        name="category"
+        class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    >
+        <option value="">Translate To</option>
+        {% for key,label in category_choices %}
+            <option value="{{ key }}" {% if category_filter == key %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+    </select>
+    <select
+        name="active"
+        class="dict-filter-select bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    >
+        <option value="">All statuses</option>
+        <option value="true" {% if active_filter == 'true' %}selected{% endif %}>Active</option>
+        <option value="false" {% if active_filter == 'false' %}selected{% endif %}>Inactive</option>
+    </select>
+    <button
+        type="button"
+        id="dict-reset"
+        class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
+        </svg>
+        Reset
+    </button>
+</form>
+{% endblock %}
+
+{% block list_actions %}
+<div class="flex items-center gap-2">
+    <a
+        href="#"
+        data-title="Add entry"
+        data-form-url="{% url 'overwatch:dictionary_create' %}"
+        class="dict-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+        </svg>
+        Add entry
+    </a>
 </div>
+{% endblock %}
 
-<script>
-    document.addEventListener('DOMContentLoaded', () => {
-        const pageSize = document.getElementById('dict-page-size');
-        if (pageSize) {
-            pageSize.addEventListener('change', () => {
-                const form = document.getElementById('dict-filters');
-                if (form) form.submit();
-            });
-        }
-        const resetBtn = document.getElementById('dict-reset');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                const form = document.getElementById('dict-filters');
-                if (!form) return;
-                form.reset();
-                // Clear persisted inputs explicitly
-                const search = document.getElementById('dict-search');
-                if (search) search.value = '';
-                form.submit();
-            });
-        }
-        document.querySelectorAll('.dict-modal-open').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const title = btn.dataset.title || 'Dictionary entry';
-                const titleEl = document.getElementById('dict-modal-title');
-                if (titleEl) titleEl.textContent = title;
-            });
-        });
-        attachDeleteHandlers();
-    });
-    document.body.addEventListener('htmx:afterSwap', (e) => {
-        if (e.target && e.target.id === 'dictionary-table') {
-            const pageSize = document.getElementById('dict-page-size');
-            if (pageSize) {
-                pageSize.addEventListener('change', () => {
-                    const form = document.getElementById('dict-filters');
-                    if (form) form.submit();
-                });
-            }
-            const resetBtn = document.getElementById('dict-reset');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
-                    const form = document.getElementById('dict-filters');
-                    if (!form) return;
-                    form.reset();
-                    const search = document.getElementById('dict-search');
-                    if (search) search.value = '';
-                    form.submit();
-                });
-            }
-            attachDeleteHandlers();
-        }
-        if (e.target && e.target.id === 'dict-modal-body') {
-            const titleEl = document.getElementById('dict-modal-title');
-            if (titleEl && e.detail && e.detail.requestConfig && e.detail.requestConfig.elt) {
-                const btn = e.detail.requestConfig.elt;
-                const title = btn.dataset.title || 'Dictionary entry';
-                titleEl.textContent = title;
-            }
-        }
-    });
+{% block list_target_id %}dictionary-table{% endblock %}
 
-    function attachDeleteHandlers() {
-        const deleteBtns = document.querySelectorAll('.dict-delete-btn');
-        deleteBtns.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const url = btn.dataset.deleteUrl;
-                const label = btn.dataset.label || 'this entry';
-                const modal = document.getElementById('dict-delete-modal');
-                const form = document.getElementById('dict-delete-form');
-                const text = document.getElementById('dict-delete-text');
-                if (form) form.action = url;
-                if (text) text.textContent = `Are you sure you want to delete "${label}"?`;
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    modal.setAttribute('aria-hidden', 'false');
-                }
-            });
-        });
-    }
+{% block list_table %}
+{% include "overwatch/dictionary_list_partial.html" %}
+{% endblock %}
 
-    document.addEventListener('click', (e) => {
-        if (e.target.matches('[data-modal-hide="dict-delete-modal"]')) {
-            const modal = document.getElementById('dict-delete-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-            }
-        }
-    });
-</script>
+{% block list_scripts %}
+{% include "components/list_scripts.html" with prefix="dict" entity="Dictionary entry" %}
+{% endblock %}
 
-<!-- Flowbite modal -->
-<div id="dict-modal" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto bg-black/30 flex items-center justify-center">
-    <div class="relative w-full max-w-2xl max-h-full mx-auto">
-        <div class="relative bg-white rounded-lg shadow">
-            <div class="flex items-center justify-between p-4 border-b rounded-t">
-                <h3 class="text-lg font-semibold text-gray-900" id="dict-modal-title">
-                    Dictionary entry
-                </h3>
-                <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center" data-modal-hide="dict-modal">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    <span class="sr-only">Close modal</span>
-                </button>
-            </div>
-            <div class="p-4" id="dict-modal-body">
-                <!-- Form content injected by HTMX -->
-                <p class="text-sm text-gray-600">Loading form...</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Delete confirm modal -->
-<div id="dict-delete-modal" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto bg-black/30 flex items-center justify-center">
-    <div class="relative w-full max-w-md max-h-full mx-auto">
-        <div class="relative bg-white rounded-lg shadow">
-            <div class="flex items-start justify-between p-4 border-b rounded-t">
-                <h3 class="text-lg font-semibold text-gray-900">Confirm delete</h3>
-                <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center" data-modal-hide="dict-delete-modal">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    <span class="sr-only">Close modal</span>
-                </button>
-            </div>
-            <div class="p-4 space-y-4">
-                <p class="text-sm text-gray-700" id="dict-delete-text">Are you sure?</p>
-            </div>
-            <div class="flex items-center p-4 space-x-2 border-t border-gray-200 rounded-b">
-                <form id="dict-delete-form" method="post" action="">
-                    {% csrf_token %}
-                    <button type="submit" class="text-white bg-red-600 hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-sm px-4 py-2 text-center">Delete</button>
-                </form>
-                <button data-modal-hide="dict-delete-modal" type="button" class="text-gray-700 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-4 py-2">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% block list_modals %}
+{% include "components/form_modal.html" with modal_id="dict-modal" title_id="dict-modal-title" default_title="Dictionary entry" body_id="dict-modal-body" %}
+{% include "components/confirm_modal.html" with modal_id="dict-delete-modal" text_id="dict-delete-text" form_id="dict-delete-form" %}
 {% endblock %}

@@ -1,0 +1,158 @@
+{% comment %}
+Reusable JavaScript for CRUD list pages.
+Include with: {% include "components/list_scripts.html" with prefix="tag" entity="tag" %}
+
+Required variables:
+- prefix: The prefix for element IDs (e.g., "tag", "dict", "category")
+- entity: The entity name for titles (e.g., "tag", "Dictionary entry", "category")
+{% endcomment %}
+
+<script>
+(function() {
+    const PREFIX = '{{ prefix }}';
+    const ENTITY = '{{ entity|default:prefix|capfirst }}';
+
+    // Selectors based on prefix
+    const selectors = {
+        modal: `#${PREFIX}-modal`,
+        modalTitle: `#${PREFIX}-modal-title`,
+        modalBody: `#${PREFIX}-modal-body`,
+        deleteModal: `#${PREFIX}-delete-modal`,
+        deleteForm: `#${PREFIX}-delete-form`,
+        deleteText: `#${PREFIX}-delete-text`,
+        table: `#${PREFIX}-table`,
+        filters: `#${PREFIX}-filters`,
+        search: `#${PREFIX}-search`,
+        pageSize: `#${PREFIX}-page-size`,
+        reset: `#${PREFIX}-reset`,
+        modalOpenClass: `.${PREFIX}-modal-open`,
+        deleteClass: `.${PREFIX}-delete-btn`,
+    };
+
+    function attachModalOpenHandlers(scope) {
+        scope.querySelectorAll(selectors.modalOpenClass).forEach((btn) => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const title = btn.dataset.title || ENTITY;
+                const titleEl = document.querySelector(selectors.modalTitle);
+                const modal = document.querySelector(selectors.modal);
+                const modalBody = document.querySelector(selectors.modalBody);
+                if (titleEl) titleEl.textContent = title;
+                
+                // Open the modal
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                }
+                
+                // Load content via fetch - use data-form-url or hx-get
+                const url = btn.dataset.formUrl || btn.getAttribute('hx-get');
+                if (url && modalBody) {
+                    fetch(url, {
+                        headers: {
+                            'HX-Request': 'true'
+                        }
+                    })
+                    .then(response => response.text())
+                    .then(html => {
+                        modalBody.innerHTML = html;
+                        // Tell HTMX to process the new content so hx-post works
+                        if (window.htmx) {
+                            window.htmx.process(modalBody);
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    function attachDeleteHandlers(scope) {
+        scope.querySelectorAll(selectors.deleteClass).forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const url = btn.dataset.deleteUrl;
+                const label = btn.dataset.label || 'this item';
+                const modal = document.querySelector(selectors.deleteModal);
+                const form = document.querySelector(selectors.deleteForm);
+                const text = document.querySelector(selectors.deleteText);
+                if (form) form.action = url;
+                if (text) text.textContent = `Are you sure you want to delete "${label}"?`;
+                if (modal) {
+                    modal.classList.remove('hidden');
+                    modal.setAttribute('aria-hidden', 'false');
+                }
+            });
+        });
+    }
+
+    function attachPageSizeHandler() {
+        const pageSize = document.querySelector(selectors.pageSize);
+        if (pageSize) {
+            pageSize.addEventListener('change', () => {
+                const form = document.querySelector(selectors.filters);
+                if (form) form.submit();
+            });
+        }
+    }
+
+    function attachResetHandler() {
+        const resetBtn = document.querySelector(selectors.reset);
+        if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+                const form = document.querySelector(selectors.filters);
+                if (!form) return;
+                form.reset();
+                const search = document.querySelector(selectors.search);
+                if (search) search.value = '';
+                form.submit();
+            });
+        }
+    }
+
+    function initListPage(scope) {
+        attachModalOpenHandlers(scope);
+        attachDeleteHandlers(scope);
+        attachPageSizeHandler();
+        attachResetHandler();
+    }
+
+    // Initial setup
+    document.addEventListener('DOMContentLoaded', () => {
+        initListPage(document);
+    });
+
+    // Re-attach after HTMX swaps
+    document.body.addEventListener('htmx:afterSwap', (e) => {
+        if (e.target && e.target.id === `${PREFIX}-table`) {
+            initListPage(document);
+        }
+        if (e.target && e.target.id === `${PREFIX}-modal-body`) {
+            const titleEl = document.querySelector(selectors.modalTitle);
+            if (titleEl && e.detail && e.detail.requestConfig && e.detail.requestConfig.elt) {
+                const btn = e.detail.requestConfig.elt;
+                const title = btn.dataset.title || ENTITY;
+                titleEl.textContent = title;
+            }
+        }
+    });
+
+    // Delete modal close handler
+    document.addEventListener('click', (e) => {
+        if (e.target.matches(`[data-modal-hide="${PREFIX}-delete-modal"]`)) {
+            const modal = document.querySelector(selectors.deleteModal);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        }
+        // Form modal close handler
+        if (e.target.matches(`[data-modal-hide="${PREFIX}-modal"]`) || e.target.closest(`[data-modal-hide="${PREFIX}-modal"]`)) {
+            const modal = document.querySelector(selectors.modal);
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.setAttribute('aria-hidden', 'true');
+            }
+        }
+    });
+})();
+</script>

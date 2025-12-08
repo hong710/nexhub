@@ -1,86 +1,70 @@
-{% extends "base.html" %}
-{% block title %}Categories - NexHub{% endblock %}
-{% block content %}
-{% url 'overwatch:category_create' as category_add_url %}
-<div class="bg-white h-full flex flex-col overflow-hidden">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
-        <div class="flex items-center gap-3 flex-wrap">
-            <div class="flex items-center gap-2 text-blue-900">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M4 12h16M4 19h10" />
-                </svg>
-                <h1 class="text-2xl font-semibold text-slate-900">Categories</h1>
-            </div>
-            <form
-                id="cat-filters"
-                hx-get="."
-                hx-target="#category-table"
-                hx-trigger="keyup changed delay:250ms from:#cat-search, submit"
-                hx-swap="outerHTML"
-                class="flex items-center gap-2 flex-wrap"
-            >
-                <input
-                    id="cat-search"
-                    type="search"
-                    name="q"
-                    value="{{ query }}"
-                    placeholder="Search device type"
-                    class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input type="hidden" name="page_size" value="{{ page_size }}">
-                <button
-                    type="button"
-                    id="cat-reset"
-                    class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
-                    </svg>
-                    Reset
-                </button>
-            </form>
-            <a
-                href="#"
-                data-modal-target="category-modal"
-                data-modal-toggle="category-modal"
-                data-title="Add category"
-                hx-get="{{ category_add_url }}"
-                hx-target="#category-modal-body"
-                hx-swap="innerHTML"
-                class="category-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
-                </svg>
-                Add category
-            </a>
-        </div>
-    </div>
+{% extends "components/list_page.html" %}
+{% block page_title %}Categories - NexHub{% endblock %}
 
-    <div class="h-3"></div>
+{% block list_icon %}
+<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M4 12h16M4 19h10" />
+</svg>
+{% endblock %}
 
-    <div id="category-table" class="flex-1 overflow-hidden min-h-0 px-0">
-        {% include "overwatch/category_list_partial.html" %}
-    </div>
-</div>
+{% block list_heading %}Categories{% endblock %}
 
-<!-- Flowbite modal for Add/Edit Category (content via HTMX) -->
-<div id="category-modal" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto bg-black/30 flex items-center justify-center">
-    <div class="relative w-full max-w-2xl max-h-full mx-auto">
-        <div class="relative bg-white rounded-lg shadow">
-            <div class="flex items-center justify-between p-4 border-b rounded-t">
-                <h3 class="text-lg font-semibold text-gray-900" id="category-modal-title">
-                    Category
-                </h3>
-                <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center" data-modal-hide="category-modal">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    <span class="sr-only">Close modal</span>
-                </button>
-            </div>
-            <div class="p-4" id="category-modal-body">
-                <p class="text-sm text-gray-600">Loading form...</p>
-            </div>
-        </div>
-    </div>
-</div>
+{% block list_filters %}
+<form
+    id="category-filters"
+    hx-get="."
+    hx-target="#category-table"
+    hx-trigger="keyup changed delay:250ms from:#category-search, submit"
+    hx-swap="outerHTML"
+    class="flex items-center gap-2 flex-wrap"
+>
+    <input
+        id="category-search"
+        type="search"
+        name="q"
+        value="{{ query }}"
+        placeholder="Search device type"
+        class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    />
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <button
+        type="button"
+        id="category-reset"
+        class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
+        </svg>
+        Reset
+    </button>
+</form>
+{% endblock %}
+
+{% block list_actions %}
+<a
+    href="#"
+    data-title="Add category"
+    data-form-url="{% url 'overwatch:category_create' %}"
+    class="category-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+>
+    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+    </svg>
+    Add category
+</a>
+{% endblock %}
+
+{% block list_target_id %}category-table{% endblock %}
+
+{% block list_table %}
+{% include "overwatch/category_list_partial.html" %}
+{% endblock %}
+
+{% block list_modals %}
+{% include "components/form_modal.html" with modal_id="category-modal" title_id="category-modal-title" default_title="Category" body_id="category-modal-body" %}
+{% include "components/confirm_modal.html" with modal_id="category-delete-modal" text_id="category-delete-text" form_id="category-delete-form" %}
+{% endblock %}
+
+{% block list_scripts %}
+{% include "components/list_scripts.html" with prefix="category" entity="Category" %}
 {% endblock %}

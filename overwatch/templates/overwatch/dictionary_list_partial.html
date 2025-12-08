@@ -1,5 +1,5 @@
 <div id="dictionary-table" class="relative flex flex-col h-full overflow-hidden rounded-lg border border-slate-200 shadow-inner">
-    <div class="flex-1 overflow-auto">
+    <div class="flex-1 overflow-auto min-h-0">
         <table class="min-w-full table-auto text-sm text-left text-gray-700">
             <thead class="text-xs uppercase bg-blue-800 text-white sticky top-0 z-30">
                 <tr>
@@ -36,12 +36,8 @@
                     <td class="px-4 py-2 text-[12px] text-blue-700 flex items-center gap-3">
                         <a
                             href="#"
-                            data-modal-target="dict-modal"
-                            data-modal-toggle="dict-modal"
                             data-title="Edit entry"
-                            hx-get="{% url 'overwatch:dictionary_edit' item.pk %}"
-                            hx-target="#dict-modal-body"
-                            hx-swap="innerHTML"
+                            data-form-url="{% url 'overwatch:dictionary_edit' item.pk %}"
                             class="dict-modal-open font-medium text-blue-700 hover:underline"
                         >Edit</a>
                         <button
@@ -63,67 +59,5 @@
         </table>
     </div>
 
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-t border-slate-200 bg-white px-3 py-3 sticky bottom-0">
-        <div class="flex flex-wrap items-center gap-3">
-            <div class="text-sm text-slate-600">
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-            </div>
-            <div class="flex items-center gap-2">
-                <a
-                    href="?page=1&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
-                >&laquo;</a>
-                {% if page_obj.has_previous %}
-                <a
-                    href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
-                >&lsaquo;</a>
-                {% else %}
-                <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70">&lsaquo;</span>
-                {% endif %}
-                <div class="inline-flex items-center gap-1">
-                    {% for p in elided_pages %}
-                        {% if p == '…' %}
-                            <span class="px-2 py-2 text-sm text-slate-500">…</span>
-                        {% elif p == page_obj.number %}
-                            <span class="px-3 py-2 text-sm bg-blue-600 text-white rounded border border-blue-600">{{ p }}</span>
-                        {% else %}
-                            <a
-                                href="?page={{ p }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
-                            >{{ p }}</a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% if page_obj.has_next %}
-                <a
-                    href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
-                >&rsaquo;</a>
-                {% else %}
-                <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70">&rsaquo;</span>
-                {% endif %}
-                <a
-                    href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800"
-                >&raquo;</a>
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                <span>Records per page</span>
-                <select
-                    id="dict-page-size"
-                    name="page_size"
-                    form="dict-filters"
-                    class="rounded border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600"
-                >
-                    {% for size in page_sizes %}
-                    <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-        </div>
-        <div class="text-sm text-slate-700">
-            Count {{ filtered_count }} of {{ total_all_count }} rows
-        </div>
-    </div>
+    {% include "components/pagination.html" with prefix="dict" %}
 </div>

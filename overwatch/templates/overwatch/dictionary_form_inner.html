@@ -1,5 +1,19 @@
 <div class="space-y-4">
-    <form method="post" action="{{ form_action|default:request.path }}" class="space-y-4">
+    {% if form.non_field_errors %}
+    <div class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
+        {% for error in form.non_field_errors %}
+            <p>{{ error }}</p>
+        {% endfor %}
+    </div>
+    {% endif %}
+    <form 
+        method="post" 
+        action="{{ form_action|default:request.path }}" 
+        class="space-y-4"
+        hx-post="{{ form_action|default:request.path }}"
+        hx-target="#dict-modal-body"
+        hx-swap="innerHTML"
+    >
         {% csrf_token %}
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>

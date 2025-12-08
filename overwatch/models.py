@@ -52,10 +52,10 @@ DICTIONARY_CATEGORY_CHOICES = [
 ]
 
 NOTE_PRIORITY_CHOICES = [
+    ("info", "Info"),
     ("low", "Low"),
     ("medium", "Medium"),
     ("high", "High"),
-    ("critical", "Critical"),
 ]
 
 
@@ -183,6 +183,10 @@ class DataDictionary(BaseModel):
     description = models.TextField(blank=True, null=True)
     is_active = models.BooleanField(default=True)
 
+    class Meta:
+        unique_together = [["original_keyword", "category"]]
+        verbose_name_plural = "Data Dictionaries"
+
     def __str__(self) -> str:
         return f"{self.original_keyword} -> {self.standardized_value}"
 
@@ -190,7 +194,7 @@ class DataDictionary(BaseModel):
 class Note(BaseModel):
     server = models.ForeignKey(Server, on_delete=models.CASCADE, related_name="notes")
     content = models.TextField()
-    priority = models.CharField(max_length=10, choices=NOTE_PRIORITY_CHOICES, default="low")
+    priority = models.CharField(max_length=10, choices=NOTE_PRIORITY_CHOICES, default="info")
     is_public = models.BooleanField(default=True)
 
     def __str__(self) -> str:

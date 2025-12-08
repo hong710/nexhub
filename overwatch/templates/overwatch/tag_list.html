@@ -1,210 +1,72 @@
-{% extends "base.html" %}
-{% block title %}Tags - NexHub{% endblock %}
-{% block content %}
-{% url 'overwatch:tag_create' as tag_add_url %}
-<div class="bg-white h-full flex flex-col overflow-hidden">
-    <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between px-2 pt-2">
-        <div class="flex items-center gap-3 flex-wrap">
-            <div class="flex items-center gap-2 text-blue-900">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 5h16M4 12h16M4 19h10" />
-                </svg>
-                <h1 class="text-2xl font-semibold text-slate-900">Tags</h1>
-            </div>
-            <form
-                id="tag-filters"
-                hx-get="."
-                hx-target="#tag-table"
-                hx-trigger="keyup changed delay:250ms from:#tag-search, submit"
-                hx-swap="outerHTML"
-                class="flex items-center gap-2 flex-wrap"
-            >
-                <input
-                    id="tag-search"
-                    type="search"
-                    name="q"
-                    value="{{ query }}"
-                    placeholder="Search name or description"
-                    class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                />
-                <input type="hidden" name="page_size" value="{{ page_size }}">
-                <button
-                    type="button"
-                    id="tag-reset"
-                    class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
-                    </svg>
-                    Reset
-                </button>
-            </form>
-            <a
-                href="#"
-                data-modal-target="tag-modal"
-                data-modal-toggle="tag-modal"
-                data-title="Add tag"
-                hx-get="{{ tag_add_url }}"
-                hx-target="#tag-modal-body"
-                hx-swap="innerHTML"
-                class="tag-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
-                </svg>
-                Add tag
-            </a>
-        </div>
-    </div>
+{% extends "components/list_page.html" %}
+{% block page_title %}Tags - NexHub{% endblock %}
 
-    <div class="h-3"></div>
+{% block list_icon %}
+<svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+</svg>
+{% endblock %}
 
-    <div id="tag-table" class="flex-1 overflow-hidden min-h-0 px-0">
-        {% include "overwatch/tag_list_partial.html" %}
-    </div>
+{% block list_heading %}Tags{% endblock %}
+
+{% block list_filters %}
+<form
+    id="tag-filters"
+    hx-get="."
+    hx-target="#tag-table"
+    hx-trigger="keyup changed delay:250ms from:#tag-search, change from:.tag-filter-select, submit"
+    hx-swap="outerHTML"
+    class="flex items-center gap-2 flex-wrap"
+>
+    <input
+        id="tag-search"
+        type="search"
+        name="q"
+        value="{{ query }}"
+        placeholder="Search tag names, descriptions"
+        class="w-80 bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500"
+    />
+    <input type="hidden" name="page_size" value="{{ page_size }}">
+    <button
+        type="button"
+        id="tag-reset"
+        class="inline-flex items-center gap-1 px-4 py-2 text-sm font-medium text-gray-900 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
+        </svg>
+        Reset
+    </button>
+</form>
+{% endblock %}
+
+{% block list_actions %}
+<div class="flex items-center gap-2">
+    <a
+        href="#"
+        data-title="Add tag"
+        data-form-url="{% url 'overwatch:tag_create' %}"
+        class="tag-modal-open inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 5v14m-7-7h14" />
+        </svg>
+        Add tag
+    </a>
 </div>
+{% endblock %}
 
-<script>
-    function attachTagDeleteHandlers() {
-        const deleteBtns = document.querySelectorAll('.tag-delete-btn');
-        deleteBtns.forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const url = btn.dataset.deleteUrl;
-                const label = btn.dataset.label || 'this tag';
-                const modal = document.getElementById('tag-delete-modal');
-                const form = document.getElementById('tag-delete-form');
-                const text = document.getElementById('tag-delete-text');
-                if (form) form.action = url;
-                if (text) text.textContent = `Are you sure you want to delete "${label}"?`;
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    modal.setAttribute('aria-hidden', 'false');
-                }
-            });
-        });
-    }
+{% block list_target_id %}tag-table{% endblock %}
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const pageSize = document.getElementById('tag-page-size');
-        if (pageSize) {
-            pageSize.addEventListener('change', () => {
-                const form = document.getElementById('tag-filters');
-                if (form) form.submit();
-            });
-        }
-        const resetBtn = document.getElementById('tag-reset');
-        if (resetBtn) {
-            resetBtn.addEventListener('click', () => {
-                const form = document.getElementById('tag-filters');
-                if (!form) return;
-                form.reset();
-                const search = document.getElementById('tag-search');
-                if (search) search.value = '';
-                form.submit();
-            });
-        }
-        document.querySelectorAll('.tag-modal-open').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                const title = btn.dataset.title || 'Tag';
-                const titleEl = document.getElementById('tag-modal-title');
-                if (titleEl) titleEl.textContent = title;
-            });
-        });
-        attachTagDeleteHandlers();
-    });
+{% block list_table %}
+{% include "overwatch/tag_list_partial.html" %}
+{% endblock %}
 
-    document.body.addEventListener('htmx:afterSwap', (e) => {
-        if (e.target && e.target.id === 'tag-table') {
-            const pageSize = document.getElementById('tag-page-size');
-            if (pageSize) {
-                pageSize.addEventListener('change', () => {
-                    const form = document.getElementById('tag-filters');
-                    if (form) form.submit();
-                });
-            }
-            const resetBtn = document.getElementById('tag-reset');
-            if (resetBtn) {
-                resetBtn.addEventListener('click', () => {
-                    const form = document.getElementById('tag-filters');
-                    if (!form) return;
-                    form.reset();
-                    const search = document.getElementById('tag-search');
-                    if (search) search.value = '';
-                    form.submit();
-                });
-            }
-            document.querySelectorAll('.tag-modal-open').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    const title = btn.dataset.title || 'Tag';
-                    const titleEl = document.getElementById('tag-modal-title');
-                    if (titleEl) titleEl.textContent = title;
-                });
-            });
-            attachTagDeleteHandlers();
-        }
-        if (e.target && e.target.id === 'tag-modal-body') {
-            const titleEl = document.getElementById('tag-modal-title');
-            if (titleEl && e.detail && e.detail.requestConfig && e.detail.requestConfig.elt) {
-                const btn = e.detail.requestConfig.elt;
-                const title = btn.dataset.title || 'Tag';
-                titleEl.textContent = title;
-            }
-        }
-    });
+{% block list_scripts %}
+{% include "components/list_scripts.html" with prefix="tag" entity="Tag" %}
+{% endblock %}
 
-    document.addEventListener('click', (e) => {
-        if (e.target.matches('[data-modal-hide="tag-delete-modal"]')) {
-            const modal = document.getElementById('tag-delete-modal');
-            if (modal) {
-                modal.classList.add('hidden');
-                modal.setAttribute('aria-hidden', 'true');
-            }
-        }
-    });
-</script>
-
-<!-- Tag modal -->
-<div id="tag-modal" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto bg-black/30 flex items-center justify-center">
-    <div class="relative w-full max-w-2xl max-h-full mx-auto">
-        <div class="relative bg-white rounded-lg shadow">
-            <div class="flex items-center justify-between p-4 border-b rounded-t">
-                <h3 class="text-lg font-semibold text-gray-900" id="tag-modal-title">
-                    Tag
-                </h3>
-                <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center" data-modal-hide="tag-modal">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    <span class="sr-only">Close modal</span>
-                </button>
-            </div>
-            <div class="p-4" id="tag-modal-body">
-                <p class="text-sm text-gray-600">Loading form...</p>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Delete confirm modal -->
-<div id="tag-delete-modal" tabindex="-1" aria-hidden="true" class="fixed inset-0 z-50 hidden w-full p-4 overflow-x-hidden overflow-y-auto bg-black/30 flex items-center justify-center">
-    <div class="relative w-full max-w-md max-h-full mx-auto">
-        <div class="relative bg-white rounded-lg shadow">
-            <div class="flex items-start justify-between p-4 border-b rounded-t">
-                <h3 class="text-lg font-semibold text-gray-900">Confirm delete</h3>
-                <button type="button" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center" data-modal-hide="tag-delete-modal">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    <span class="sr-only">Close modal</span>
-                </button>
-            </div>
-            <div class="p-4 space-y-4">
-                <p class="text-sm text-gray-700" id="tag-delete-text">Are you sure?</p>
-            </div>
-            <div class="flex items-center p-4 space-x-2 border-t border-gray-200 rounded-b">
-                <form id="tag-delete-form" method="post" action="">
-                    {% csrf_token %}
-                    <button type="submit" class="text-white bg-red-600 hover:bg-red-700 focus:ring-4 focus:outline-none focus:ring-red-300 font-medium rounded-lg text-sm px-4 py-2 text-center">Delete</button>
-                </form>
-                <button data-modal-hide="tag-delete-modal" type="button" class="text-gray-700 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-4 py-2">Cancel</button>
-            </div>
-        </div>
-    </div>
-</div>
+{% block list_modals %}
+{% include "components/form_modal.html" with modal_id="tag-modal" title_id="tag-modal-title" default_title="Tag" body_id="tag-modal-body" %}
+{% include "components/confirm_modal.html" with modal_id="tag-delete-modal" text_id="tag-delete-text" form_id="tag-delete-form" %}
 {% endblock %}
