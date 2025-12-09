@@ -146,6 +146,9 @@ pip install -r requirements.txt
 # Run migrations
 python manage.py migrate
 
+# Collect static files (CSS, JS)
+python manage.py collectstatic --noinput
+
 # Create superuser
 python manage.py createsuperuser
 
@@ -158,6 +161,15 @@ python manage.py runserver
 ### Seed Demo Data (Optional)
 ```bash
 python manage.py seed_demo
+```
+
+### Static Files
+The project uses **local static files** instead of CDN for production readiness:
+- **Tailwind CSS v3.4.17** - `/static/js/tailwind.min.js`
+- **Flowbite v2.2.1** - `/static/css/flowbite.min.css` and `/static/js/flowbite.min.js`
+- **HTMX v1.9.12** - `/static/js/htmx.min.js`
+
+Static files are collected to `staticfiles/` directory (excluded from git) when you run `collectstatic`.
 ```
 
 ### Access the Application
