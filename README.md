@@ -146,7 +146,8 @@ pip install -r requirements.txt
 # Run migrations
 python manage.py migrate
 
-# Collect static files (CSS, JS)
+# Collect static files (CSS, JS) - Required for production deployment
+# For development, this step is optional as Django serves static files automatically
 python manage.py collectstatic --noinput
 
 # Create superuser
@@ -169,7 +170,10 @@ The project uses **local static files** instead of CDN for production readiness:
 - **Flowbite v2.2.1** - `/static/css/flowbite.min.css` and `/static/js/flowbite.min.js`
 - **HTMX v1.9.12** - `/static/js/htmx.min.js`
 
-Static files are collected to `staticfiles/` directory (excluded from git) when you run `collectstatic`.
+**How it works:**
+- **Development**: Django automatically serves files from `/static/` directory
+- **Production**: Run `collectstatic` to copy all static files to `/staticfiles/` for web server (Nginx/Apache) to serve
+- The `staticfiles/` directory is excluded from git (generated during deployment)
 ```
 
 ### Access the Application
