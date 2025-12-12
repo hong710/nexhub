@@ -71,6 +71,8 @@ Required variables:
                         if (window.htmx) {
                             window.htmx.process(modalBody);
                         }
+                        // Re-attach delete handlers for any delete buttons in the modal
+                        attachDeleteHandlers(modalBody);
                     });
                 }
             });

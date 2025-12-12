@@ -69,4 +69,17 @@
             <button type="button" data-modal-hide="dict-modal" class="text-sm text-gray-700 hover:underline">Cancel</button>
         </div>
     </form>
+    {% if object.pk %}
+    <div class="border-t pt-4 mt-4">
+        <p class="text-sm text-gray-600 mb-3">Danger Zone:</p>
+        <button
+            type="button"
+            class="font-medium text-red-600 hover:bg-red-50 px-3 py-2 rounded dict-delete-btn"
+            data-delete-url="{% url 'overwatch:dictionary_delete' object.pk %}"
+            data-label="{{ object.original_keyword }}"
+        >
+            Delete Entry
+        </button>
+    </div>
+    {% endif %}
 </div>

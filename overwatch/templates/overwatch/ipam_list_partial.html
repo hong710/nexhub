@@ -1,0 +1,135 @@
+{% load static %}
+
+<!-- IPAM Table Partial - Used by HTMX for filtering -->
+<div id="ipam-table" class="relative w-full h-full overflow-hidden rounded-lg border border-slate-200 shadow-inner">
+    <div class="h-full overflow-auto">
+        <table class="min-w-full table-fixed border-collapse text-[12px]">
+            <thead class="bg-blue-800 text-white border-b border-blue-900 sticky top-0 z-10">
+                <tr>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 w-12">#</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 min-w-28 whitespace-nowrap">IP Address</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 min-w-24 whitespace-nowrap">Status</th>
+                    <th class="px-2 py-2 text-center font-semibold align-top border-r border-blue-900 w-12">Ping</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 min-w-40 whitespace-nowrap">Hostname</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 min-w-36 whitespace-nowrap">MAC Address</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top border-r border-blue-900 min-w-24 whitespace-nowrap">Type</th>
+                    <th class="px-2 py-2 text-left font-semibold align-top whitespace-nowrap">Note</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 bg-white">
+                {% if ipam_records %}
+                    {% for ipam in ipam_records %}
+                    <tr class="hover:bg-blue-50" data-row>
+                        <!-- Row Number -->
+                        <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 text-center w-12">
+                            {{ forloop.counter }}
+                        </td>
+                        
+                        <!-- IP Address -->
+                        <td class="px-2 py-1.5 text-[12px] text-slate-900 border-r border-slate-200 font-mono font-semibold whitespace-nowrap min-w-28">
+                            {{ ipam.ip_address }}
+                        </td>
+                        
+                        <!-- Status -->
+                        <td class="px-2 py-1.5 text-[12px] border-r border-slate-200 whitespace-nowrap min-w-24">
+                            {% if ipam.status == "available" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-green-700 bg-green-100 rounded">Available</span>
+                            {% elif ipam.status == "assigned" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-blue-700 bg-blue-100 rounded">Assigned</span>
+                            {% elif ipam.status == "reserved" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-yellow-700 bg-yellow-100 rounded">Reserved</span>
+                            {% elif ipam.status == "conflict" %}
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded">
+                                    <span class="w-2 h-2 bg-red-600 rounded-full"></span>
+                                    Conflict
+                                </span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded">{{ ipam.status|title }}</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Ping (Only for Assigned status) -->
+                        <td class="px-2 py-1.5 text-[12px] border-r border-slate-200 text-center w-12">
+                            {% if ipam.status == "assigned" %}
+                                {% if ipam.active %}
+                                    <!-- Green indicator for online -->
+                                    <span class="inline-flex items-center justify-center w-2.5 h-2.5 bg-green-500 rounded-full" title="Online"></span>
+                                {% else %}
+                                    <!-- Red indicator for offline -->
+                                    <span class="inline-flex items-center justify-center w-2.5 h-2.5 bg-red-500 rounded-full" title="Offline"></span>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-slate-300">—</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Hostname (Clickable) -->
+                        <td class="px-2 py-1.5 text-[12px] text-slate-900 border-r border-slate-200 whitespace-nowrap min-w-40">
+                            {% if ipam.hostname %}
+                                {% if ipam.server_id %}
+                                    <a href="{% url 'overwatch:server_detail' ipam.server_id %}" class="text-blue-600 hover:text-blue-800 hover:underline font-medium">
+                                        {{ ipam.hostname }}
+                                        {% if ipam.is_bmc %}<span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded ml-1">BMC</span>{% endif %}
+                                    </a>
+                                {% else %}
+                                    <span class="text-slate-900">{{ ipam.hostname }}</span>
+                                    {% if ipam.is_bmc %}<span class="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded ml-1">BMC</span>{% endif %}
+                                {% endif %}
+                            {% else %}
+                                <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- MAC Address -->
+                        <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 font-mono whitespace-nowrap min-w-36">
+                            {% if ipam.mac_address %}
+                                {{ ipam.mac_address }}
+                            {% else %}
+                                <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Type -->
+                        <td class="px-2 py-1.5 text-[12px] border-r border-slate-200 whitespace-nowrap min-w-24">
+                            {% if ipam.ip_type == "static" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-purple-700 bg-purple-100 rounded">Static</span>
+                            {% elif ipam.ip_type == "dhcp" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-indigo-700 bg-indigo-100 rounded">DHCP</span>
+                            {% elif ipam.ip_type == "subnet_not_exist" %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded">No Subnet</span>
+                            {% else %}
+                                <span class="px-2 py-0.5 text-xs font-medium text-slate-700 bg-slate-100 rounded">{{ ipam.ip_type }}</span>
+                            {% endif %}
+                        </td>
+                        
+                        <!-- Note (for reserved IPs) -->
+                        <td class="px-2 py-1.5 text-[12px]">
+                            {% if ipam.status == "reserved" and ipam.description %}
+                                <div class="max-w-xs">
+                                    <p class="text-xs text-slate-700 truncate" title="{{ ipam.description }}">{{ ipam.description }}</p>
+                                    {% if ipam.updated_by %}
+                                        <p class="text-[10px] text-slate-500 mt-0.5">by {{ ipam.updated_by }}</p>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="8" class="text-center py-12">
+                            <svg class="w-12 h-12 text-slate-300 mb-4 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <p class="text-slate-500 text-sm">No IP addresses found</p>
+                        </td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+

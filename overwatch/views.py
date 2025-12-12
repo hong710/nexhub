@@ -1,15 +1,24 @@
 import json
 from dataclasses import dataclass
+from io import StringIO
 from typing import Any
 
 from django import forms
 from django.core.paginator import Paginator
+from django.core.management import call_command
+from django.views.decorators.http import require_POST
+from django.contrib import messages
 from django.db.models import Q, QuerySet
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 
-from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, Note, Server, Subnet, Tag
+from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, IPAM, IPAM_STATUS_CHOICES, Note, Server, Subnet, Tag
+from .serializers import CategorySerializer, ServerSerializer, SubnetSerializer, TagSerializer
 
 
 # =============================================================================
@@ -151,6 +160,7 @@ def generic_edit_view(
         "form_title": f"Edit {config.entity_name}",
         "submit_label": "Update",
         "form_action": reverse(config.edit_url_name, args=[pk]),
+        "object": instance,
     }
     if extra_context:
         context.update(extra_context)
@@ -434,6 +444,22 @@ def dictionary_edit(request: HttpRequest, pk: int) -> HttpResponse:
 
 def dictionary_delete(request: HttpRequest, pk: int) -> HttpResponse:
     return generic_delete_view(request, pk, DICTIONARY_CONFIG)
+
+
+@require_POST
+def dictionary_apply_translations(request: HttpRequest) -> HttpResponse:
+    if not request.user.is_staff:
+        return HttpResponse("Error: Forbidden - Staff access required", status=403, content_type="text/plain")
+
+    dry_run = request.POST.get("dry_run") == "true"
+    buffer = StringIO()
+    try:
+        call_command("apply_translations", dry_run=dry_run, stdout=buffer)
+        output = buffer.getvalue()
+    except Exception as e:
+        output = f"Error: {str(e)}"
+    
+    return HttpResponse(output, content_type="text/plain; charset=utf-8")
 
 
 class TagForm(forms.ModelForm):
@@ -800,6 +826,442 @@ def subnet_detail(request: HttpRequest, pk: int) -> HttpResponse:
     return render(request, "overwatch/subnet_detail_modal.html", context)
 
 
+# =============================================================================
+# IPAM VIEWS
+# =============================================================================
+
+class IPAMForm(forms.ModelForm):
+    class Meta:
+        model = IPAM
+        fields = ["ip_address", "subnet", "status", "server", "mac_address", "description", "active"]
+        widgets = {
+            "ip_address": forms.TextInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. 192.168.1.10"}),
+            "subnet": forms.Select(attrs={"class": FORM_SELECT_CLASS}),
+            "status": forms.Select(attrs={"class": FORM_SELECT_CLASS}),
+            "server": forms.Select(attrs={"class": FORM_SELECT_CLASS}),
+            "mac_address": forms.TextInput(attrs={"class": FORM_INPUT_CLASS, "placeholder": "e.g. 00:11:22:33:44:55"}),
+            "description": forms.Textarea(attrs={"class": FORM_TEXTAREA_CLASS, "rows": 3}),
+            "active": forms.CheckboxInput(attrs={"class": FORM_CHECKBOX_CLASS}),
+        }
+
+
+IPAM_CONFIG = CRUDConfig(
+    model=IPAM,
+    form_class=IPAMForm,
+    list_url_name="overwatch:ipam_list",
+    create_url_name="overwatch:ipam_create",
+    edit_url_name="overwatch:ipam_edit",
+    delete_url_name="overwatch:ipam_delete",
+    template_prefix="overwatch/ipam",
+    entity_name="IP address",
+)
+
+
+def ipam_list(request: HttpRequest) -> HttpResponse:
+    """Database-driven IPAM view - shows static and DHCP IP allocations."""
+    import ipaddress as ip_lib
+    
+    # Get filter parameters
+    query = request.GET.get("q", "")
+    subnet_filter = request.GET.get("subnet", "")
+    status_filter = request.GET.get("status", "")
+    ip_type_filter = request.GET.get("ip_type", "")
+    
+    # Get all subnets for filter dropdown
+    subnets = Subnet.objects.all().order_by("name")
+    
+    # Build IPAM query
+    ipam_records = IPAM.objects.select_related("subnet", "server")
+    
+    # Filter by subnet
+    selected_subnet = None
+    if subnet_filter:
+        ipam_records = ipam_records.filter(subnet_id=subnet_filter)
+        selected_subnet = subnets.filter(pk=subnet_filter).first()
+    
+    # Filter by status
+    if status_filter:
+        ipam_records = ipam_records.filter(status=status_filter)
+    
+    # Filter by IP type
+    if ip_type_filter:
+        ipam_records = ipam_records.filter(ip_type=ip_type_filter)
+    
+    # Search filter (IP, hostname, MAC)
+    if query:
+        ipam_records = ipam_records.filter(
+            Q(ip_address__icontains=query) |
+            Q(hostname__icontains=query) |
+            Q(mac_address__icontains=query) |
+            Q(server__hostname__icontains=query)
+        )
+    
+    # Fetch all and sort by IP address numerically
+    ipam_list_data = []
+    try:
+        for ipam in ipam_records:
+            ipam_list_data.append({
+                'id': ipam.id,
+                'ip_address': ipam.ip_address,
+                'ip_int': int(ip_lib.ip_address(ipam.ip_address)),  # For sorting
+                'subnet_id': ipam.subnet.id if ipam.subnet else None,
+                'subnet_name': ipam.subnet.name if ipam.subnet else '',
+                'subnet_network': ipam.subnet.network if ipam.subnet else '',
+                'status': ipam.status,
+                'ip_type': ipam.ip_type,
+                'active': ipam.active,
+                'hostname': ipam.hostname,
+                'mac_address': ipam.mac_address,
+                'server_id': ipam.server_id if ipam.server else None,
+                'is_bmc': ipam.is_bmc,
+                'description': ipam.description,
+                'updated_by': ipam.updated_by.username if ipam.updated_by else None,
+                'updated_at': ipam.updated_at,
+            })
+        # Sort numerically by IP
+        ipam_list_data.sort(key=lambda x: x['ip_int'])
+    except Exception as e:
+        print(f"Error sorting IPs: {e}")
+    
+    # Calculate stats
+    total_ips = len(ipam_list_data)
+    available = sum(1 for ip in ipam_list_data if ip['status'] == "available")
+    assigned = sum(1 for ip in ipam_list_data if ip['status'] == "assigned")
+    reserved = sum(1 for ip in ipam_list_data if ip['status'] == "reserved")
+    
+    # Check if this is an HTMX request for partial update
+    if request.headers.get('HX-Request') == 'true':
+        # Return partial template with just the table
+        context = {
+            "ipam_records": ipam_list_data,
+            "total_ips": total_ips,
+            "stats": {
+                "available": available,
+                "assigned": assigned,
+                "reserved": reserved,
+            },
+        }
+        return render(request, "overwatch/ipam_list_partial.html", context)
+    
+    context = {
+        "query": query,
+        "subnet_filter": subnet_filter,
+        "status_filter": status_filter,
+        "ip_type_filter": ip_type_filter,
+        "subnets": subnets,
+        "selected_subnet": selected_subnet,
+        "ipam_records": ipam_list_data,
+        "total_ips": total_ips,
+        "stats": {
+            "available": available,
+            "assigned": assigned,
+            "reserved": reserved,
+        },
+        "status_choices": IPAM_STATUS_CHOICES,
+    }
+    
+    return render(request, "overwatch/ipam_list.html", context)
+
+
+def ipam_available_ips(request: HttpRequest, subnet_id: int) -> JsonResponse:
+    """Get available IPs for a subnet (for reservation modal)."""
+    import ipaddress as ip_lib
+    
+    try:
+        # Get available IPs from this subnet
+        available_ips = IPAM.objects.filter(
+            subnet_id=subnet_id,
+            status="available"
+        ).order_by("ip_address")
+        
+        # Sort numerically
+        ip_list = []
+        for ipam in available_ips:
+            try:
+                ip_list.append({
+                    'id': ipam.id,
+                    'ip_address': ipam.ip_address,
+                    'ip_int': int(ip_lib.ip_address(ipam.ip_address))
+                })
+            except:
+                pass
+        
+        ip_list.sort(key=lambda x: x['ip_int'])
+        
+        # Remove ip_int from response
+        for ip in ip_list:
+            del ip['ip_int']
+        
+        return JsonResponse({'ips': ip_list})
+    except Exception as e:
+        return JsonResponse({'ips': [], 'error': str(e)})
+
+
+def ipam_reserve(request: HttpRequest) -> JsonResponse:
+    """Reserve one or more IP addresses."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+    
+    try:
+        ip_ids = request.POST.getlist('ip_ids')
+        note = request.POST.get('note', '').strip()
+        
+        print(f"DEBUG: ip_ids={ip_ids}, note={note}")  # Debug logging
+        
+        if not ip_ids:
+            return JsonResponse({'success': False, 'message': 'No IPs selected'})
+        
+        if not note:
+            return JsonResponse({'success': False, 'message': 'Note is required'})
+        
+        # Update all selected IPs
+        updated_count = 0
+        errors = []
+        for ip_id in ip_ids:
+            try:
+                ipam = IPAM.objects.get(id=ip_id, status='available')
+                ipam.status = 'reserved'
+                ipam.description = note
+                ipam.updated_by = request.user
+                ipam.save()
+                updated_count += 1
+                print(f"DEBUG: Reserved IP {ipam.ip_address}")  # Debug logging
+            except IPAM.DoesNotExist:
+                errors.append(f"IP ID {ip_id} not found or not available")
+                continue
+            except Exception as e:
+                errors.append(f"Error with IP ID {ip_id}: {str(e)}")
+                continue
+        
+        if updated_count > 0:
+            return JsonResponse({
+                'success': True,
+                'message': f'{updated_count} IP(s) reserved successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'No IPs were available for reservation. Errors: {", ".join(errors)}'
+            })
+    
+    except Exception as e:
+        print(f"DEBUG: Exception in ipam_reserve: {str(e)}")  # Debug logging
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'})
+
+
+def ipam_create(request: HttpRequest) -> HttpResponse:
+    return generic_create_view(request, IPAM_CONFIG)
+
+
+def ipam_unreserve(request: HttpRequest, pk: int) -> JsonResponse:
+    """Unreserve an IP address - only creator or superuser can do this."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+    
+    try:
+        ipam = IPAM.objects.get(pk=pk)
+        
+        # Check if IP is reserved
+        if ipam.status != 'reserved':
+            return JsonResponse({'success': False, 'message': 'IP is not reserved'})
+        
+        # Check permissions - only creator or superuser can unreserve
+        if not (request.user.is_superuser or ipam.updated_by == request.user):
+            return JsonResponse({
+                'success': False,
+                'message': 'You do not have permission to unreserve this IP. Only the user who reserved it or a superuser can unreserve.'
+            }, status=403)
+        
+        # Unreserve the IP
+        ipam.status = 'available'
+        ipam.description = None
+        ipam.updated_by = request.user
+        ipam.save()
+        
+        print(f"DEBUG: IP {ipam.ip_address} unreserved by {request.user.username}")
+        
+        return JsonResponse({
+            'success': True,
+            'message': f'IP {ipam.ip_address} unreserved successfully'
+        })
+    
+    except IPAM.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'IP not found'}, status=404)
+    except Exception as e:
+        print(f"DEBUG: Error in ipam_unreserve: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
+
+
+def ipam_my_reserved_ips(request: HttpRequest) -> JsonResponse:
+    """Fetch IPs reserved by the logged-in user."""
+    if request.method != 'GET':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+    
+    try:
+        # Get all IPs reserved by current user
+        reserved_ips = IPAM.objects.filter(
+            status='reserved',
+            updated_by=request.user
+        ).select_related('subnet').order_by('ip_address')
+        
+        ips_data = []
+        for ipam in reserved_ips:
+            ips_data.append({
+                'id': ipam.id,
+                'ip_address': str(ipam.ip_address),
+                'subnet': ipam.subnet.network if ipam.subnet else 'N/A',
+                'description': ipam.description or '',
+                'status': ipam.status,
+                'hostname': ipam.hostname or '—'
+            })
+        
+        return JsonResponse({
+            'success': True,
+            'ips': ips_data,
+            'count': len(ips_data)
+        })
+    
+    except Exception as e:
+        print(f"DEBUG: Error in ipam_my_reserved_ips: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
+
+
+def ipam_release_ips(request: HttpRequest) -> JsonResponse:
+    """Release (unreserve) one or more IPs reserved by the logged-in user."""
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+    
+    try:
+        ip_ids = request.POST.getlist('ip_ids')
+        
+        if not ip_ids:
+            return JsonResponse({'success': False, 'message': 'No IPs selected'})
+        
+        # Release all selected IPs (only if user is creator)
+        released_count = 0
+        errors = []
+        
+        for ip_id in ip_ids:
+            try:
+                ipam = IPAM.objects.get(id=ip_id, status='reserved', updated_by=request.user)
+                ipam.status = 'available'
+                ipam.description = None
+                ipam.updated_by = request.user
+                ipam.save()
+                released_count += 1
+            except IPAM.DoesNotExist:
+                errors.append(f"IP ID {ip_id} not found or not reserved by you")
+                continue
+            except Exception as e:
+                errors.append(f"Error with IP ID {ip_id}: {str(e)}")
+                continue
+        
+        if released_count > 0:
+            return JsonResponse({
+                'success': True,
+                'message': f'{released_count} IP(s) released successfully'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': f'No IPs were released. Errors: {", ".join(errors)}'
+            })
+    
+    except Exception as e:
+        print(f"DEBUG: Exception in ipam_release_ips: {str(e)}")
+        return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
+
+
+def ipam_edit(request: HttpRequest, pk: int) -> HttpResponse:
+    """Custom IPAM edit with permission checking for reserved IPs."""
+    try:
+        ipam = IPAM.objects.get(pk=pk)
+        
+        # Check permissions for reserved IPs
+        if ipam.status == 'reserved':
+            # Only creator (updated_by) or superuser can edit reserved IPs
+            if not (request.user.is_superuser or ipam.updated_by == request.user):
+                return HttpResponse(
+                    '<div class="p-4 text-red-600 font-medium">❌ You do not have permission to edit this reserved IP. Only the user who reserved it or a superuser can make changes.</div>',
+                    status=403
+                )
+        
+        # Handle POST (form submission)
+        if request.method == 'POST':
+            form = IPAMForm(request.POST, instance=ipam)
+            if form.is_valid():
+                old_status = ipam.status
+                ipam = form.save(commit=False)
+                new_status = form.cleaned_data['status']
+                
+                # If status changed from reserved to available, clear description
+                if old_status == 'reserved' and new_status == 'available':
+                    ipam.description = None
+                    print(f"DEBUG: Unreserving IP {ipam.ip_address} - clearing description")
+                
+                ipam.updated_by = request.user
+                ipam.save()
+                
+                print(f"DEBUG: IP {ipam.ip_address} updated - status: {old_status} → {new_status}")
+                
+                # Return success response
+                return HttpResponse(
+                    '<div class="p-4 text-green-600 font-medium">✓ IP updated successfully</div>',
+                    headers={'HX-Trigger': 'ipamUpdated'}
+                )
+            else:
+                # Return form errors
+                error_html = '<div class="p-4 text-red-600"><strong>Form errors:</strong><ul>'
+                for field, errors in form.errors.items():
+                    error_html += f'<li>{field}: {", ".join(errors)}</li>'
+                error_html += '</ul></div>'
+                return HttpResponse(error_html, status=400)
+        
+        # Handle GET (show form)
+        else:
+            form = IPAMForm(instance=ipam)
+        
+        context = {
+            'form': form,
+            'instance': ipam,
+            'model_name': 'IPAM',
+            'can_edit_reserved': ipam.status != 'reserved' or request.user.is_superuser or ipam.updated_by == request.user,
+        }
+        return render(request, 'overwatch/ipam_form_inner.html', context)
+    
+    except IPAM.DoesNotExist:
+        return HttpResponse('<div class="p-4 text-red-600">❌ IP not found</div>', status=404)
+    except Exception as e:
+        print(f"DEBUG: Error in ipam_edit: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return HttpResponse(f'<div class="p-4 text-red-600">❌ Error: {str(e)}</div>', status=500)
+
+
+def ipam_delete(request: HttpRequest, pk: int) -> HttpResponse:
+    """Custom IPAM delete with permission checking for reserved IPs."""
+    try:
+        ipam = IPAM.objects.get(pk=pk)
+        
+        # Check permissions for reserved IPs
+        if ipam.status == 'reserved':
+            # Only creator or superuser can delete reserved IPs
+            if not (request.user.is_superuser or ipam.updated_by == request.user):
+                return JsonResponse({
+                    'success': False,
+                    'message': 'You do not have permission to delete this reserved IP.'
+                }, status=403)
+        
+        return generic_delete_view(request, pk, IPAM_CONFIG)
+    
+    except IPAM.DoesNotExist:
+        return JsonResponse({'success': False, 'message': 'IP not found'}, status=404)
+
+
 import re
 import ipaddress
 
@@ -1109,3 +1571,71 @@ def server_note_delete(request: HttpRequest, pk: int, note_pk: int) -> HttpRespo
         if request.user.is_authenticated and request.user == note.updated_by:
             note.delete()
     return redirect("overwatch:server_detail", pk=pk)
+
+
+# =============================================================================
+# REST API VIEWSETS
+# =============================================================================
+
+
+class ServerViewSet(viewsets.ModelViewSet):
+    """API endpoint for Server CRUD operations."""
+
+    queryset = Server.objects.all().prefetch_related("tags").select_related("category")
+    serializer_class = ServerSerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ["hostname", "ip_address", "uuid", "status", "os", "manufacture", "category"]
+    search_fields = ["hostname", "ip_address", "uuid", "manufacture", "product_name"]
+    ordering_fields = ["hostname", "created_at", "updated_at"]
+    ordering = ["-created_at"]
+
+    @action(detail=False, methods=["post"])
+    def bulk_create(self, request):
+        """Create multiple servers at once."""
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"])
+    def update_status(self, request, pk=None):
+        """Update server status."""
+        server = self.get_object()
+        new_status = request.data.get("status")
+        if new_status not in dict(Server._meta.get_field("status").choices):
+            return Response({"error": "Invalid status"}, status=status.HTTP_400_BAD_REQUEST)
+        server.status = new_status
+        server.save()
+        return Response(self.get_serializer(server).data)
+
+
+class CategoryViewSet(viewsets.ModelViewSet):
+    """API endpoint for Category CRUD operations."""
+
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+    permission_classes = [IsAuthenticated]
+    filterset_fields = ["device_type"]
+    search_fields = ["device_type"]
+    ordering = ["device_type"]
+
+
+class TagViewSet(viewsets.ModelViewSet):
+    """API endpoint for Tag CRUD operations."""
+
+    queryset = Tag.objects.all()
+    serializer_class = TagSerializer
+    permission_classes = [IsAuthenticated]
+    search_fields = ["name", "description"]
+    ordering = ["name"]
+
+
+class SubnetViewSet(viewsets.ModelViewSet):
+    """API endpoint for Subnet CRUD operations."""
+
+    queryset = Subnet.objects.all()
+    serializer_class = SubnetSerializer
+    permission_classes = [IsAuthenticated]
+    search_fields = ["name", "network", "description"]
+    ordering = ["name"]
+

@@ -21,6 +21,7 @@ ALLOWED_HOSTS: list[str] = []
 # Application definition
 
 INSTALLED_APPS = [
+    "jazzmin",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -28,6 +29,8 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "overwatch",
+    "rest_framework",
+    "rest_framework.authtoken",
 ]
 
 MIDDLEWARE = [
@@ -115,3 +118,79 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # https://docs.djangoproject.com/en/stable/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Django REST Framework
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": [
+        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework.authentication.SessionAuthentication",
+    ],
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 100,
+}
+
+# Jazzmin Admin Configuration
+JAZZMIN_SETTINGS = {
+    "site_title": "NexHub Admin",
+    "site_header": "NexHub Infrastructure",
+    "site_brand": "NexHub",
+    "login_logo": None,
+    "logo_title": None,
+    "copyright": "NexHub Infrastructure Management",
+    "search_model": ["overwatch.Server", "overwatch.Category"],
+    "user_avatar": None,
+    "topmenu_links": [
+        {"name": "Home", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "API", "url": "/api/", "permissions": ["auth.view_user"]},
+        {"name": "Docs", "url": "/api/schema/", "permissions": ["auth.view_user"]},
+    ],
+    "usersettings_allow_user_preferences": True,
+    "show_sidebar": True,
+    "navigation_expanded": True,
+    "hide_apps": [],
+    "hide_models": [],
+    "order_with_respect_to": [
+        "overwatch.Server",
+        "overwatch.Category",
+        "overwatch.Tag",
+        "overwatch.DataDictionary",
+    ],
+    "icons": {
+        "overwatch.Server": "fas fa-server",
+        "overwatch.Category": "fas fa-folder",
+        "overwatch.Tag": "fas fa-tag",
+        "overwatch.DataDictionary": "fas fa-book",
+        "overwatch.Subnet": "fas fa-network-wired",
+        "overwatch.Note": "fas fa-sticky-note",
+        "auth.User": "fas fa-user",
+        "auth.Group": "fas fa-users",
+    },
+    "default_icon_parents": "fas fa-chevron-right",
+    "default_icon_children": "fas fa-arrow-right",
+    "custom_css": None,
+    "custom_js": None,
+    "use_google_fonts_cdn": True,
+    "show_ui_builder": False,
+    "changeform_format": "horizontal_tabs",
+    "changeform_format_overrides": {
+        "overwatch.server": "collapsible",
+        "auth.user": "collapsible",
+    },
+}
+
+JAZZMIN_UI_TWEAKS = {
+    "navbar_small": False,
+    "footer_small": False,
+    "body_small": False,
+    "brand_small": False,
+    "brand_colour": "navbar-danger",
+    "accent": "accent-primary",
+    "tooltip_class": "tooltip-dark",
+    "sidebar_nav_small_text": False,
+    "dashboard_chart_device_support": True,
+    "admin_paginate_change_list_view": 25,
+}
+

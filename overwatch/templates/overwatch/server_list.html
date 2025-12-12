@@ -105,13 +105,9 @@
             const tagOptions = header.dataset.tagOptions ? header.dataset.tagOptions.split(',').filter(Boolean) : null;
 
             const buildPanel = () => {
-                const visibleRows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter(
-                    (tr) => !tr.classList.contains('hidden')
-                );
-                const sourceCells =
-                    visibleRows.length > 0
-                        ? visibleRows.flatMap((tr) => Array.from(tr.querySelectorAll(`td[data-col="${col}"]`)))
-                        : Array.from(document.querySelectorAll(`tbody td[data-col="${col}"]`));
+                // Get ALL rows from the table (including hidden ones) to show all distinct values
+                const allRows = Array.from(document.querySelectorAll('tbody tr[data-row]'));
+                const sourceCells = allRows.flatMap((tr) => Array.from(tr.querySelectorAll(`td[data-col="${col}"]`)));
 
                 let values;
                 if (col === 'tags' && tagOptions) {
@@ -121,10 +117,33 @@
                         .map((td) => td.textContent.trim())
                         .filter((v) => v !== "");
                 }
-                const unique = col === 'tags' && tagOptions
-                    ? Array.from(new Set(values))
-                    : Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+                
+                // Sort with IP-aware sorting for IP columns
+                let unique;
+                if (col === 'tags' && tagOptions) {
+                    unique = Array.from(new Set(values));
+                } else if (col === 'ip_address' || col === 'bmc_ip') {
+                    const ipToString = (ip) => {
+                        if (ip === "—") return "999.999.999.999";
+                        const parts = ip.split('.');
+                        if (parts.length !== 4) return "999.999.999.999";
+                        return parts.map(p => String(parseInt(p, 10) || 0).padStart(3, '0')).join('.');
+                    };
+                    unique = Array.from(new Set(values)).sort((a, b) => ipToString(a).localeCompare(ipToString(b)));
+                } else {
+                    unique = Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
+                }
+                
                 let working = new Set(window.__activeFilterState[col] ? Array.from(window.__activeFilterState[col]) : []);
+
+                // Count occurrences of each value
+                const valueCounts = {};
+                unique.forEach((val) => {
+                    valueCounts[val] = sourceCells.filter((td) => {
+                        const cellVal = td.textContent.trim();
+                        return cellVal === val;
+                    }).length;
+                });
 
                 const NO_TAG = "__NO_TAG__";
 
@@ -143,21 +162,24 @@
 
                 panel.innerHTML = `
                     <div class="p-3 space-y-3 text-slate-800">
-                        <div class="flex items-center gap-2">
-                            <input type="search" placeholder="Search values" data-filter-search="${col}"
-                                class="w-full rounded border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-xs px-2 py-1">
-                            <div class="flex flex-col gap-1">
-                                <button type="button" data-filter-sort="${col}" data-dir="asc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
-                                    <span class="text-[11px] font-semibold text-blue-700">A</span>
-                                    <span class="text-[11px]">Z</span>
-                                    <span class="text-xs">↓</span>
-                                </button>
-                                <button type="button" data-filter-sort="${col}" data-dir="desc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
-                                    <span class="text-[11px] font-semibold text-blue-700">Z</span>
-                                    <span class="text-[11px]">A</span>
-                                    <span class="text-xs">↓</span>
-                                </button>
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <input type="search" placeholder="Search values" data-filter-search="${col}"
+                                    class="w-full rounded border-slate-300 focus:border-blue-600 focus:ring-blue-600 text-xs px-2 py-1">
+                                <div class="flex flex-col gap-1">
+                                    <button type="button" data-filter-sort="${col}" data-dir="asc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
+                                        <span class="text-[11px] font-semibold text-blue-700">A</span>
+                                        <span class="text-[11px]">Z</span>
+                                        <span class="text-xs">↓</span>
+                                    </button>
+                                    <button type="button" data-filter-sort="${col}" data-dir="desc" class="flex items-center justify-center px-2 py-1 rounded bg-white text-xs border border-slate-200 hover:bg-slate-100">
+                                        <span class="text-[11px] font-semibold text-blue-700">Z</span>
+                                        <span class="text-[11px]">A</span>
+                                        <span class="text-xs">↓</span>
+                                    </button>
+                                </div>
                             </div>
+                            <span class="text-xs text-slate-500 font-medium ml-2 flex-shrink-0">Total: ${unique.length}</span>
                         </div>
                         <div class="flex items-center gap-2 text-xs">
                             <button type="button" data-filter-selectall="${col}" class="px-2 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Select all</button>
@@ -175,14 +197,15 @@
 
                 const listEl = panel.querySelector(`[data-filter-list="${col}"]`);
                 const searchInput = panel.querySelector(`[data-filter-search="${col}"]`);
+                let currentFilteredValues = unique;
 
                 searchInput.addEventListener('input', () => {
                     const term = searchInput.value.toLowerCase();
-                    const filtered = unique.filter((v) => {
+                    currentFilteredValues = unique.filter((v) => {
                         const label = v === "__NO_TAG__" ? "No tag" : v;
                         return label.toLowerCase().includes(term);
                     });
-                    listEl.innerHTML = renderList(filtered);
+                    listEl.innerHTML = renderList(currentFilteredValues);
                 });
 
                 panel.addEventListener('change', (e) => {
@@ -198,12 +221,22 @@
 
                 panel.addEventListener('click', (e) => {
                     if (e.target.closest(`[data-filter-selectall="${col}"]`)) {
-                        working = new Set(unique);
-                        listEl.innerHTML = renderList(unique);
+                        // Select all currently filtered values
+                        currentFilteredValues.forEach((v) => working.add(v));
+                        listEl.innerHTML = renderList(currentFilteredValues);
+                        // Check all visible checkboxes
+                        listEl.querySelectorAll(`[data-filter-checkbox="${col}"]`).forEach((cb) => {
+                            cb.checked = true;
+                        });
                     }
                     if (e.target.closest(`[data-filter-clear="${col}"]`)) {
-                        working = new Set();
-                        listEl.innerHTML = renderList(unique);
+                        // Unselect all currently filtered values
+                        currentFilteredValues.forEach((v) => working.delete(v));
+                        listEl.innerHTML = renderList(currentFilteredValues);
+                        // Uncheck all visible checkboxes
+                        listEl.querySelectorAll(`[data-filter-checkbox="${col}"]`).forEach((cb) => {
+                            cb.checked = false;
+                        });
                     }
                     if (e.target.closest(`[data-filter-sort="${col}"]`)) {
                         const dir = e.target.closest(`[data-filter-sort]`).dataset.dir;
@@ -329,8 +362,23 @@
         if (!tbody) return;
         const rows = Array.from(tbody.querySelectorAll('tr[data-row]'));
         rows.sort((a, b) => {
-            const av = (a.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim().toLowerCase();
-            const bv = (b.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim().toLowerCase();
+            const av = (a.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim();
+            const bv = (b.querySelector(`td[data-col="${col}"]`)?.textContent || "").trim();
+            
+            // IP-aware sorting for IP columns
+            if (col === 'ip_address' || col === 'bmc_ip') {
+                const ipToString = (ip) => {
+                    if (ip === "—") return "999.999.999.999";
+                    const parts = ip.split('.');
+                    if (parts.length !== 4) return "999.999.999.999";
+                    return parts.map(p => String(parseInt(p, 10) || 0).padStart(3, '0')).join('.');
+                };
+                const strA = ipToString(av);
+                const strB = ipToString(bv);
+                return direction === 'asc' ? strA.localeCompare(strB) : strB.localeCompare(strA);
+            }
+            
+            // Default string sorting for other columns
             return direction === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
         });
         rows.forEach((row) => tbody.appendChild(row));

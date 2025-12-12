@@ -1,0 +1,571 @@
+{% extends "base.html" %}
+{% block title %}IP Address Management - NexHub{% endblock %}
+
+{% block content %}
+<div class="bg-white flex-1 flex flex-col overflow-hidden min-h-0">
+    <!-- Header Section -->
+    <div class="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between px-2 pt-2 flex-shrink-0">
+        <!-- Title -->
+        <div class="flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+            <h1 class="text-xl font-semibold text-slate-900">IPAM</h1>
+            <span class="text-sm text-slate-500 ml-2">{{ total_ips }} IPs</span>
+        </div>
+
+        <!-- Filters -->
+        <form
+            id="ipam-filters"
+            hx-get="."
+            hx-target="#ipam-table-wrapper"
+            hx-trigger="keyup changed delay:300ms from:#search, change from:select, submit"
+            hx-swap="innerHTML"
+            class="flex items-center gap-1.5 flex-wrap"
+        >
+            <!-- Subnet Filter -->
+            <label class="inline-flex flex-col text-xs text-slate-700">
+                <span class="mb-0.5 font-medium">Subnet</span>
+                <select
+                    name="subnet"
+                    class="rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-xs py-1 px-2"
+                >
+                    <option value="">All Subnets</option>
+                    {% for subnet in subnets %}
+                        <option value="{{ subnet.id }}" {% if subnet_filter == subnet.id|stringformat:"s" %}selected{% endif %}>
+                            {{ subnet.network }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </label>
+            
+            <!-- IP Type Filter -->
+            <label class="inline-flex flex-col text-xs text-slate-700">
+                <span class="mb-0.5 font-medium">Type</span>
+                <select
+                    name="ip_type"
+                    class="rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-xs py-1 px-2"
+                >
+                    <option value="">All Types</option>
+                    <option value="static" {% if ip_type_filter == "static" %}selected{% endif %}>Static</option>
+                    <option value="dhcp" {% if ip_type_filter == "dhcp" %}selected{% endif %}>DHCP</option>
+                    <option value="subnet_not_exist" {% if ip_type_filter == "subnet_not_exist" %}selected{% endif %}>No Subnet</option>
+                </select>
+            </label>
+            
+            <!-- Status Filter -->
+            <label class="inline-flex flex-col text-xs text-slate-700">
+                <span class="mb-0.5 font-medium">Status</span>
+                <select
+                    name="status"
+                    class="rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-xs py-1 px-2"
+                >
+                    <option value="">All Status</option>
+                    <option value="available" {% if status_filter == "available" %}selected{% endif %}>Available</option>
+                    <option value="assigned" {% if status_filter == "assigned" %}selected{% endif %}>Assigned</option>
+                    <option value="reserved" {% if status_filter == "reserved" %}selected{% endif %}>Reserved</option>
+                    <option value="conflict" {% if status_filter == "conflict" %}selected{% endif %}>Conflict</option>
+                </select>
+            </label>
+            
+            <!-- Search -->
+            <label class="inline-flex flex-col text-xs text-slate-700">
+                <span class="mb-0.5 font-medium">Search</span>
+                <input
+                    id="search"
+                    type="search"
+                    name="q"
+                    value="{{ query }}"
+                    placeholder="IP, hostname, MAC..."
+                    class="w-80 rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-xs py-1 px-2"
+                />
+            </label>
+            
+            <!-- Reserve IP Button -->
+            <div class="inline-flex flex-col text-xs text-slate-700">
+                <span class="mb-0.5 font-medium opacity-0">Action</span>
+                <button
+                    type="button"
+                    onclick="openReserveModal()"
+                    class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-blue-600 text-white hover:bg-blue-700 shadow-sm text-xs font-medium"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Reserve IP
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Stats Bar -->
+    <div class="px-2 py-1.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center gap-3 text-xs text-slate-600 flex-shrink-0">
+        <div class="flex gap-3">
+            <div class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-green-400 rounded-full"></span>
+                <span>Available: <span class="font-semibold text-green-700">{{ stats.available }}</span></span>
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-blue-400 rounded-full"></span>
+                <span>Assigned: <span class="font-semibold text-blue-700">{{ stats.assigned }}</span></span>
+            </div>
+            <div class="flex items-center gap-1">
+                <span class="w-2 h-2 bg-yellow-400 rounded-full"></span>
+                <span>Reserved: <span class="font-semibold text-yellow-700">{{ stats.reserved }}</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table -->
+    <div id="ipam-table-wrapper" class="flex-1 overflow-hidden min-h-0 px-0">
+        {% include "overwatch/ipam_list_partial.html" %}
+    </div>
+</div>
+
+<!-- IP Reservation Modal -->
+<div id="reserve-modal" data-modal-backdrop="static" tabindex="-1" aria-hidden="true" class="hidden fixed inset-0 z-50 overflow-y-auto overflow-x-hidden bg-gray-900/50 flex justify-center items-center">
+    <div class="relative p-4 w-full max-w-3xl max-h-full">
+        <div class="relative bg-white rounded-lg shadow">
+            <!-- Modal header -->
+            <div class="flex items-center justify-between p-4 md:p-5 border-b rounded-t">
+                <h3 class="text-lg font-semibold text-gray-900">
+                    IP Reservation Management
+                </h3>
+                <button type="button" onclick="closeReserveModal()" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center">
+                    <svg class="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
+                        <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
+                    </svg>
+                    <span class="sr-only">Close modal</span>
+                </button>
+            </div>
+
+            <!-- Tabs Navigation -->
+            <div class="flex border-b bg-slate-50">
+                <button
+                    type="button"
+                    id="tab-reserve-btn"
+                    onclick="switchReserveTab('reserve')"
+                    class="flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-blue-600 text-blue-600 hover:text-blue-700"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Reserve your IP
+                </button>
+                <button
+                    type="button"
+                    id="tab-myips-btn"
+                    onclick="switchReserveTab('myips')"
+                    class="flex-1 px-4 py-3 text-sm font-medium text-center border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Your Reserved IPs
+                </button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="p-4">
+                <!-- Tab 1: Reserve IP -->
+                <div id="tab-reserve" class="space-y-4">
+                    <form id="reserve-form" action="{% url 'overwatch:ipam_reserve' %}" method="post">
+                        {% csrf_token %}
+                        <div class="space-y-4">
+                            <!-- Subnet Selection -->
+                            <div>
+                                <label for="reserve-subnet" class="block text-sm font-medium text-slate-700 mb-1">
+                                    Subnet <span class="text-red-500">*</span>
+                                </label>
+                                <select
+                                    id="reserve-subnet"
+                                    name="subnet_id"
+                                    required
+                                    onchange="loadAvailableIPs(this.value)"
+                                    class="w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
+                                >
+                                    <option value="">Select a subnet</option>
+                                    {% for subnet in subnets %}
+                                        <option value="{{ subnet.id }}">{{ subnet.network }} ({{ subnet.name }})</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+
+                            <!-- IP Selection -->
+                            <div>
+                                <label for="reserve-ips" class="block text-sm font-medium text-slate-700 mb-1">
+                                    Available IPs <span class="text-red-500">*</span>
+                                </label>
+                                <div id="available-ips-container" class="border border-slate-300 rounded-lg p-3 max-h-60 overflow-y-auto bg-slate-50">
+                                    <p class="text-sm text-slate-500">Please select a subnet first</p>
+                                </div>
+                            </div>
+
+                            <!-- Note -->
+                            <div>
+                                <label for="reserve-note" class="block text-sm font-medium text-slate-700 mb-1">
+                                    Note <span class="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    id="reserve-note"
+                                    name="note"
+                                    required
+                                    rows="3"
+                                    placeholder="Reason for reservation..."
+                                    class="w-full rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
+                                ></textarea>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2 mt-6">
+                            <button
+                                type="button"
+                                onclick="closeReserveModal()"
+                                class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 text-sm font-medium"
+                            >
+                                Reserve
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Tab 2: My Reserved IPs -->
+                <div id="tab-myips" class="hidden space-y-4">
+                    <div id="my-reserved-ips-container" class="border border-slate-300 rounded-lg max-h-96 overflow-y-auto">
+                        <p class="text-sm text-slate-500 p-4">Loading your reserved IPs...</p>
+                    </div>
+
+                    <form id="release-form">
+                        <div class="flex items-center justify-end gap-2 mt-6">
+                            <button
+                                type="button"
+                                onclick="closeReserveModal()"
+                                class="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 text-sm font-medium"
+                            >
+                                Close
+                            </button>
+                            <button
+                                type="submit"
+                                class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                                id="release-btn"
+                                disabled
+                            >
+                                Release Selected
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Add HTMX indicators
+    document.body.addEventListener('htmx:request', function(evt) {
+        if (evt.detail.xhr.responseURL.includes('/ipam/')) {
+            const wrapper = document.getElementById('ipam-table-wrapper');
+            if (wrapper) {
+                wrapper.style.opacity = '0.6';
+                wrapper.style.pointerEvents = 'none';
+            }
+        }
+    });
+
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.xhr.responseURL.includes('/ipam/')) {
+            const wrapper = document.getElementById('ipam-table-wrapper');
+            if (wrapper) {
+                wrapper.style.opacity = '1';
+                wrapper.style.pointerEvents = 'auto';
+            }
+        }
+    });
+
+    // Reservation modal functions
+    function openReserveModal() {
+        document.getElementById('reserve-modal').classList.remove('hidden');
+        // Reset to first tab
+        switchReserveTab('reserve');
+        document.getElementById('reserve-form').reset();
+        document.getElementById('available-ips-container').innerHTML = '<p class="text-sm text-slate-500">Please select a subnet first</p>';
+    }
+
+    function closeReserveModal() {
+        document.getElementById('reserve-modal').classList.add('hidden');
+    }
+
+    function switchReserveTab(tab) {
+        // Hide both tabs
+        document.getElementById('tab-reserve').classList.add('hidden');
+        document.getElementById('tab-myips').classList.add('hidden');
+
+        // Remove active styles from buttons
+        document.getElementById('tab-reserve-btn').classList.remove('border-blue-600', 'text-blue-600', 'hover:text-blue-700');
+        document.getElementById('tab-reserve-btn').classList.add('border-transparent', 'text-slate-600', 'hover:text-slate-900', 'hover:border-slate-300');
+        
+        document.getElementById('tab-myips-btn').classList.remove('border-blue-600', 'text-blue-600', 'hover:text-blue-700');
+        document.getElementById('tab-myips-btn').classList.add('border-transparent', 'text-slate-600', 'hover:text-slate-900', 'hover:border-slate-300');
+
+        if (tab === 'reserve') {
+            // Show reserve tab
+            document.getElementById('tab-reserve').classList.remove('hidden');
+            document.getElementById('tab-reserve-btn').classList.add('border-blue-600', 'text-blue-600', 'hover:text-blue-700');
+            document.getElementById('tab-reserve-btn').classList.remove('border-transparent', 'text-slate-600', 'hover:text-slate-900', 'hover:border-slate-300');
+        } else if (tab === 'myips') {
+            // Show my reserved IPs tab
+            document.getElementById('tab-myips').classList.remove('hidden');
+            document.getElementById('tab-myips-btn').classList.add('border-blue-600', 'text-blue-600', 'hover:text-blue-700');
+            document.getElementById('tab-myips-btn').classList.remove('border-transparent', 'text-slate-600', 'hover:text-slate-900', 'hover:border-slate-300');
+            
+            // Load user's reserved IPs
+            loadMyReservedIPs();
+        }
+    }
+
+    async function loadMyReservedIPs() {
+        const container = document.getElementById('my-reserved-ips-container');
+        container.innerHTML = '<p class="text-sm text-slate-500 p-4">Loading...</p>';
+        
+        try {
+            const response = await fetch('/ipam/my-reserved-ips/');
+            const data = await response.json();
+            
+            if (data.success && data.ips && data.ips.length > 0) {
+                const html = `
+                    <div class="divide-y">
+                        ${data.ips.map(ip => `
+                            <label class="flex items-center gap-3 p-4 hover:bg-slate-50 cursor-pointer border-b">
+                                <input 
+                                    type="checkbox" 
+                                    name="release_ip_ids" 
+                                    value="${ip.id}" 
+                                    class="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+                                    onchange="updateReleaseButton()"
+                                >
+                                <div class="flex-1">
+                                    <p class="text-sm font-mono font-medium text-slate-900">${ip.ip_address}</p>
+                                    <p class="text-xs text-slate-600">${ip.subnet}</p>
+                                    <p class="text-xs text-slate-700 mt-1"><strong>Note:</strong> ${ip.description}</p>
+                                    <p class="text-xs text-slate-600 mt-1"><strong>Hostname:</strong> ${ip.hostname}</p>
+                                </div>
+                            </label>
+                        `).join('')}
+                    </div>
+                `;
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p class="text-sm text-slate-500 p-4">You have no reserved IPs</p>';
+            }
+        } catch (error) {
+            console.error('Error loading reserved IPs:', error);
+            container.innerHTML = '<p class="text-sm text-red-500 p-4">Error loading reserved IPs</p>';
+        }
+    }
+
+    function updateReleaseButton() {
+        const checkedCount = document.querySelectorAll('input[name="release_ip_ids"]:checked').length;
+        const releaseBtn = document.getElementById('release-btn');
+        releaseBtn.disabled = checkedCount === 0;
+    }
+
+    async function loadAvailableIPs(subnetId) {
+        const container = document.getElementById('available-ips-container');
+        if (!subnetId) {
+            container.innerHTML = '<p class="text-sm text-slate-500">Please select a subnet first</p>';
+            return;
+        }
+
+        container.innerHTML = '<p class="text-sm text-slate-500">Loading...</p>';
+        
+        try {
+            const response = await fetch(`/ipam/available-ips/${subnetId}/`);
+            const data = await response.json();
+            
+            if (data.ips && data.ips.length > 0) {
+                const html = data.ips.map(ip => `
+                    <label class="flex items-center gap-2 p-2 hover:bg-blue-50 rounded cursor-pointer">
+                        <input type="checkbox" name="ip_ids" value="${ip.id}" class="rounded border-slate-300 text-blue-600 focus:ring-blue-600">
+                        <span class="text-sm font-mono">${ip.ip_address}</span>
+                    </label>
+                `).join('');
+                container.innerHTML = html;
+            } else {
+                container.innerHTML = '<p class="text-sm text-slate-500">No available IPs in this subnet</p>';
+            }
+        } catch (error) {
+            container.innerHTML = '<p class="text-sm text-red-500">Error loading IPs</p>';
+        }
+    }
+
+    // Show Flowbite alert
+    function showAlert(message, type = 'success') {
+        const alertId = 'alert-' + Date.now();
+        const alertClass = type === 'success' ? 'bg-green-50 text-green-800 border-green-200' : 'bg-red-50 text-red-800 border-red-200';
+        const iconSvg = type === 'success' 
+            ? '<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>'
+            : '<svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/></svg>';
+        
+        const alert = document.createElement('div');
+        alert.id = alertId;
+        alert.className = `fixed top-4 right-4 p-4 mb-4 text-sm border rounded-lg z-[9999] flex items-center gap-3 ${alertClass}`;
+        alert.innerHTML = `
+            ${iconSvg}
+            <span>${message}</span>
+            <button type="button" onclick="document.getElementById('${alertId}').remove()" class="ml-auto">
+                <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </button>
+        `;
+        document.body.appendChild(alert);
+        
+        // Auto-remove after 4 seconds
+        setTimeout(() => {
+            if (document.getElementById(alertId)) {
+                document.getElementById(alertId).remove();
+            }
+        }, 4000);
+    }
+
+    // Handle reservation form submission
+    document.getElementById('reserve-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const checkedIPs = document.querySelectorAll('input[name="ip_ids"]:checked');
+        
+        if (checkedIPs.length === 0) {
+            showAlert('Please select at least one IP address', 'error');
+            return;
+        }
+        
+        // Build FormData manually to ensure checkboxes are included
+        const formData = new FormData(this);
+        const btn = this.querySelector('button[type="submit"]');
+        const originalText = btn.textContent;
+        
+        btn.disabled = true;
+        btn.textContent = 'Reserving...';
+        
+        try {
+            const response = await fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                }
+            });
+            
+            const result = await response.json();
+            console.log('Server response:', result);
+            
+            if (result.success) {
+                closeReserveModal();
+                showAlert(result.message || 'IPs reserved successfully', 'success');
+                // Refresh the IPAM table
+                setTimeout(() => window.location.reload(), 1000);
+            } else {
+                showAlert(result.message || 'Error reserving IPs', 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        } catch (error) {
+            console.error('Reservation error:', error);
+            showAlert('Error reserving IPs: ' + error.message, 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+
+    // Close modal on ESC key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeReserveModal();
+            closeUnreserveModal();
+        }
+    });
+
+    // Handle release form submission
+    document.getElementById('release-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const checkedIPs = document.querySelectorAll('input[name="release_ip_ids"]:checked');
+        
+        if (checkedIPs.length === 0) {
+            showAlert('Please select at least one IP to release', 'error');
+            return;
+        }
+        
+        const formData = new FormData();
+        checkedIPs.forEach(checkbox => {
+            formData.append('ip_ids', checkbox.value);
+        });
+        
+        const btn = document.getElementById('release-btn');
+        const originalText = btn.textContent;
+        btn.disabled = true;
+        btn.textContent = 'Releasing...';
+        
+        try {
+            const response = await fetch('/ipam/release/', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken')
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showAlert(result.message || 'IPs released successfully', 'success');
+                // Reload the reserved IPs list
+                setTimeout(() => {
+                    loadMyReservedIPs();
+                    btn.disabled = true;
+                    btn.textContent = originalText;
+                }, 1000);
+            } else {
+                showAlert(result.message || 'Error releasing IPs', 'error');
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        } catch (error) {
+            console.error('Release error:', error);
+            showAlert('Error releasing IPs: ' + error.message, 'error');
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }
+    });
+
+    // Helper function to get CSRF token from cookie
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Close modal on backdrop click
+    document.getElementById('reserve-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeReserveModal();
+        }
+    });
+</script>
+{% endblock %}
+

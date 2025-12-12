@@ -35,9 +35,9 @@ DATA_SOURCE_CHOICES = [
 
 IPAM_STATUS_CHOICES = [
     ("available", "Available"),
-    ("allocated", "Allocated"),
+    ("assigned", "Assigned"),
     ("reserved", "Reserved"),
-    ("quarantine", "Quarantine"),
+    ("conflict", "Conflict"),
 ]
 
 DICTIONARY_CATEGORY_CHOICES = [
@@ -62,7 +62,13 @@ NOTE_PRIORITY_CHOICES = [
 class Category(BaseModel):
     """Device category for servers."""
 
+    ADDED_BY_CHOICES = [
+        ("agent", "Agent"),
+        ("manual", "Manual"),
+    ]
+
     device_type = models.CharField(max_length=100, unique=True)
+    added_by = models.CharField(max_length=10, choices=ADDED_BY_CHOICES, default="manual")
 
     def __str__(self) -> str:
         return self.device_type
@@ -92,6 +98,7 @@ class Server(BaseModel):
     # Hardware Information
     manufacture = models.CharField(max_length=100, blank=True, null=True)
     product_name = models.CharField(max_length=100, blank=True, null=True)
+    device_type = models.CharField(max_length=50, blank=True, null=True, help_text="Device type: server, desktop, laptop, embedded, other")
 
     # CPU Information
     cpu = models.CharField(max_length=255, blank=True, null=True)
@@ -147,6 +154,42 @@ class Server(BaseModel):
     # Miscellaneous
     misc = models.JSONField(blank=True, null=True)
 
+    def _translate_field(self, field_name: str, value: str) -> str:
+        """Translate a field value using DataDictionary if available."""
+        if not value:
+            return value
+        
+        # Try to find a translation
+        try:
+            translation = DataDictionary.objects.filter(
+                translate_from=field_name,
+                original_keyword__iexact=value,
+                is_active=True
+            ).first()
+            if translation:
+                return translation.standardized_value
+        except Exception:
+            pass
+        
+        return value
+    
+    def save(self, *args, **kwargs):
+        """Override save to apply DataDictionary translations."""
+        # Apply translations for specific fields
+        if self.product_name:
+            self.product_name = self._translate_field("product_name", self.product_name)
+        
+        if self.manufacture:
+            self.manufacture = self._translate_field("manufacture", self.manufacture)
+        
+        if self.cpu:
+            self.cpu = self._translate_field("cpu", self.cpu)
+        
+        if self.os:
+            self.os = self._translate_field("os", self.os)
+        
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
         return self.hostname
 
@@ -174,27 +217,64 @@ class Subnet(BaseModel):
             return 0
 
     def get_available_ips(self) -> int:
-        """Calculate available IPs (not allocated in IPAM)."""
+        """Calculate available static IPs (not allocated in IPAM) - only counts static pool IPs."""
         try:
             import ipaddress as ip_lib
-            net = ip_lib.ip_network(self.network, strict=False)
-            # Get all IPs in the subnet (excluding network and broadcast)
-            all_ips = set(str(ip) for ip in net.hosts())
-            # Get allocated IPs from IPAM
-            allocated_ips = set(self.ip_addresses.filter(active=True).values_list('ip_address', flat=True))
-            # Available = usable - allocated
-            return len(all_ips - allocated_ips)
+            
+            if not self.static_ip_pools:
+                return 0
+            
+            # Get all IPs in static pools
+            static_pool_ips = set()
+            for pool_range in self.static_ip_pools:
+                if '-' in pool_range:
+                    start_ip, end_ip = pool_range.split('-')
+                    start = ip_lib.ip_address(start_ip.strip())
+                    end = ip_lib.ip_address(end_ip.strip())
+                    current = start
+                    while current <= end:
+                        static_pool_ips.add(str(current))
+                        current += 1
+            
+            # Get allocated IPs from IPAM that are in static pool
+            # Status 'available' means not allocated, so we count non-available static IPs
+            allocated_static_ips = set(
+                self.ip_addresses.filter(
+                    ip_type='static'
+                ).exclude(
+                    status='available'
+                ).values_list('ip_address', flat=True)
+            )
+            
+            # Available static = static pool total - allocated static
+            return len(static_pool_ips - allocated_static_ips)
         except (ValueError, AttributeError):
             return 0
 
     def get_allocation_percentage(self) -> float:
-        """Calculate the percentage of IPs allocated."""
-        usable = self.get_usable_ips()
-        if usable == 0:
+        """Calculate the percentage of static IPs allocated."""
+        if not self.static_ip_pools:
             return 0.0
+        
+        # Get total static IPs
+        total_static = 0
+        try:
+            import ipaddress as ip_lib
+            for pool_range in self.static_ip_pools:
+                if '-' in pool_range:
+                    start_ip, end_ip = pool_range.split('-')
+                    start = ip_lib.ip_address(start_ip.strip())
+                    end = ip_lib.ip_address(end_ip.strip())
+                    total_static += int(end) - int(start) + 1
+        except (ValueError, AttributeError):
+            return 0.0
+        
+        if total_static == 0:
+            return 0.0
+        
         available = self.get_available_ips()
-        allocated = usable - available
-        return (allocated / usable) * 100
+        allocated = total_static - available
+        return (allocated / total_static) * 100
 
     def calculate_dhcp_pools(self) -> list[str]:
         """Calculate DHCP pools based on static IP pools and network range."""
@@ -292,16 +372,56 @@ class Subnet(BaseModel):
 
 
 class IPAM(BaseModel):
-    ip_address = models.GenericIPAddressField(unique=True)
-    subnet = models.ForeignKey(Subnet, on_delete=models.CASCADE, related_name="ip_addresses")
-    active = models.BooleanField(default=True)
+    """IP Address Management tracking - synced with Server table."""
+    
+    ip_address = models.GenericIPAddressField()
+    subnet = models.ForeignKey(Subnet, on_delete=models.CASCADE, related_name="ip_addresses", blank=True, null=True)
+    active = models.BooleanField(default=True, help_text="Ping check - IP is responding")
     server = models.ForeignKey(Server, on_delete=models.SET_NULL, related_name="ip_assignments", blank=True, null=True)
+    is_bmc = models.BooleanField(default=False, help_text="Is this a BMC (Baseboard Management Controller) IP?")
+    
+    # Status tracking
     status = models.CharField(max_length=20, choices=IPAM_STATUS_CHOICES, default="available")
+    ip_type = models.CharField(max_length=30, choices=[
+        ("static", "Static"),
+        ("dhcp", "DHCP"),
+        ("subnet_not_exist", "Subnet Not Exist")
+    ], default="static")
+    
+    # Device information (synced from Server)
+    hostname = models.CharField(max_length=255, blank=True, null=True)
     mac_address = models.CharField(max_length=17, blank=True, null=True)
-    description = models.TextField(blank=True, null=True)
+    platform = models.CharField(max_length=100, blank=True, null=True)
+    manufacturer = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Additional tracking
+    description = models.TextField(blank=True, null=True, help_text="Only editable when status is 'reserved'")
+    
+    class Meta:
+        unique_together = [["ip_address", "subnet"]]
+        indexes = [
+            models.Index(fields=["subnet", "status"]),
+            models.Index(fields=["ip_address"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.ip_address} ({self.status})"
+    
+    def sync_from_server(self):
+        """Sync IPAM record with Server data."""
+        if self.server:
+            self.hostname = self.server.hostname
+            self.mac_address = self.server.nic_mac
+            self.platform = self.server.device_type
+            self.manufacturer = self.server.manufacture
+            self.status = "assigned"
+            # Check if this is a BMC IP
+            self.is_bmc = (self.ip_address == self.server.bmc_ip)
+        else:
+            self.status = "available"
+            self.hostname = None
+            self.mac_address = None
+            self.is_bmc = False
 
 
 class DataDictionary(BaseModel):

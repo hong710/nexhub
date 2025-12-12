@@ -1,0 +1,92 @@
+<form method="post" hx-post="{{ request.path }}" hx-target="#ipam-modal-body" hx-swap="innerHTML">
+    {% csrf_token %}
+    <div class="space-y-4">
+        <div>
+            <label for="{{ form.ip_address.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                IP Address <span class="text-red-600">*</span>
+            </label>
+            {{ form.ip_address }}
+            {% if form.ip_address.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.ip_address.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.subnet.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                Subnet <span class="text-red-600">*</span>
+            </label>
+            {{ form.subnet }}
+            {% if form.subnet.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.subnet.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.status.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                Status <span class="text-red-600">*</span>
+            </label>
+            {{ form.status }}
+            {% if form.status.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.status.errors.0 }}</p>
+            {% endif %}
+            {% if instance.status == 'reserved' %}
+                <p class="mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
+                    💡 To unreserve this IP, change the status to "Available". The note/description will be automatically cleared.
+                </p>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.server.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                Server
+            </label>
+            {{ form.server }}
+            {% if form.server.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.server.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.mac_address.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                MAC Address
+            </label>
+            {{ form.mac_address }}
+            {% if form.mac_address.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.mac_address.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <label for="{{ form.description.id_for_label }}" class="block mb-2 text-sm font-medium text-gray-900">
+                Description
+            </label>
+            {{ form.description }}
+            {% if form.description.errors %}
+                <p class="mt-2 text-sm text-red-600">{{ form.description.errors.0 }}</p>
+            {% endif %}
+        </div>
+
+        <div class="flex items-center">
+            {{ form.active }}
+            <label for="{{ form.active.id_for_label }}" class="ms-2 text-sm font-medium text-gray-900">
+                Active
+            </label>
+        </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 pt-4 border-t border-gray-200 mt-4">
+        <button
+            type="button"
+            onclick="closeModal('ipam-modal')"
+            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:ring-4 focus:outline-none focus:ring-gray-200"
+        >
+            Cancel
+        </button>
+        <button
+            type="submit"
+            class="px-4 py-2 text-sm font-medium text-white bg-blue-700 rounded-lg hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300"
+        >
+            Save
+        </button>
+    </div>
+</form>

@@ -174,6 +174,24 @@ The project uses **local static files** instead of CDN for production readiness:
 - **Development**: Django automatically serves files from `/static/` directory
 - **Production**: Run `collectstatic` to copy all static files to `/staticfiles/` for web server (Nginx/Apache) to serve
 - The `staticfiles/` directory is excluded from git (generated during deployment)
+
+### Using the Data Dictionary
+
+The dictionary lets you normalize vendor- or source-specific terms into your own standardized labels.
+
+1) Go to `/dictionary/` (UI) and add a row for each translation you need:
+  - **Translate From**: source field name (e.g., `product_name`, `manufacture`, `cpu`, `os`).
+  - **Original Keyword**: the raw value you receive (e.g., `HP`, `HPE`, `Hewlett Packard`).
+  - **Standardized Value**: your normalized value (e.g., `HPE`).
+  - **Is Active**: keep checked to apply.
+
+2) How it is applied:
+  - When servers are saved/ingested, the fields `product_name`, `manufacture`, `cpu`, and `os` are auto-translated if a matching active dictionary entry exists (case-insensitive match on Original Keyword for the given Translate From field).
+  - Translated values are persisted back to the server record, so the normalized form is what you see and filter on.
+
+3) Tips:
+  - Enter the same standardized value for all variants you want collapsed (e.g., `Ubuntu`, `ubuntu`, `Ubuntu Server` -> `Ubuntu`).
+  - Leave an entry inactive to keep it for reference without applying it.
 ```
 
 ### Access the Application
@@ -185,6 +203,188 @@ The project uses **local static files** instead of CDN for production readiness:
    - `/tags/` - Tag management
    - `/categories/` - Category management
    - `/dictionary/` - Data dictionary
+   - `/api/` - REST API (requires token authentication)
+
+## REST API
+
+NexHub provides a comprehensive REST API for programmatic access and agent-based data collection.
+
+### API Endpoints
+
+#### Authentication
+All API endpoints require token authentication:
+```bash
+# Include token in Authorization header
+curl -H "Authorization: Token YOUR_TOKEN_HERE" http://localhost:8000/api/servers/
+```
+
+#### Generate API Token
+```bash
+python manage.py shell -c "from django.contrib.auth.models import User; from rest_framework.authtoken.models import Token; user = User.objects.get(username='YOUR_USERNAME'); token, created = Token.objects.get_or_create(user=user); print(f'Token: {token.key}')"
+```
+
+#### Available Endpoints
+
+**Servers**
+- `GET /api/servers/` - List all servers
+- `POST /api/servers/` - Create a server
+- `GET /api/servers/{id}/` - Get server details
+- `PATCH /api/servers/{id}/` - Update server
+- `DELETE /api/servers/{id}/` - Delete server
+- `POST /api/servers/bulk_create/` - Create multiple servers
+- `POST /api/servers/{id}/update_status/` - Update server status
+
+**Categories**
+- `GET /api/categories/` - List all categories
+- `POST /api/categories/` - Create a category
+- `GET /api/categories/{id}/` - Get category details
+- `PATCH /api/categories/{id}/` - Update category
+- `DELETE /api/categories/{id}/` - Delete category
+
+**Tags**
+- `GET /api/tags/` - List all tags
+- `POST /api/tags/` - Create a tag
+- `GET /api/tags/{id}/` - Get tag details
+- `PATCH /api/tags/{id}/` - Update tag
+- `DELETE /api/tags/{id}/` - Delete tag
+
+**Subnets**
+- `GET /api/subnets/` - List all subnets
+- `POST /api/subnets/` - Create a subnet
+- `GET /api/subnets/{id}/` - Get subnet details
+- `PATCH /api/subnets/{id}/` - Update subnet
+- `DELETE /api/subnets/{id}/` - Delete subnet
+
+### Query Parameters
+- `search` - Search across relevant fields
+- `ordering` - Order results (e.g., `-created_at`, `hostname`)
+- `page` - Page number (default: 1)
+- `page_size` - Results per page (default: 100)
+
+### Example API Calls
+
+**List servers:**
+```bash
+curl -H "Authorization: Token YOUR_TOKEN" \
+     "http://localhost:8000/api/servers/?search=ubuntu&page_size=10"
+```
+
+**Create a server:**
+```bash
+curl -X POST -H "Authorization: Token YOUR_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"hostname": "server01", "ip_address": "192.168.1.10", "status": "active"}' \
+     http://localhost:8000/api/servers/
+```
+
+**Update a server:**
+```bash
+curl -X PATCH -H "Authorization: Token YOUR_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{"status": "maintenance"}' \
+     http://localhost:8000/api/servers/1/
+```
+
+## Agent Script
+
+NexHub includes an agent script (`agent_linux.py`) that automatically collects system information and submits it to the API.
+
+### Agent Features
+- **Zero dependencies** - Uses only Python 3 standard library (urllib)
+- Collects hostname, IP address, MAC address
+- Detects OS information (name, version, kernel)
+- Gathers CPU details (model, core count)
+- Reports memory size
+- Lists disk information
+- Identifies system manufacturer and model
+- Updates existing servers or creates new ones
+
+### Agent Requirements
+```bash
+# No external dependencies required - Python 3.6+ only!
+python3 --version  # Verify Python 3.6 or higher
+```
+
+### Agent Usage
+
+**Dry run (preview collected data without submitting to API):**
+```bash
+python agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN --dry-run
+```
+
+This will display a formatted summary of collected system information:
+```
+================================================================================
+DRY RUN MODE - DATA COLLECTION PREVIEW
+================================================================================
+
+🖥️  BASIC INFO:
+   Hostname:     ubuntu-hp-g2
+   UUID:         8c178819-2df5-3be8-4a9f-169e2a10f205
+   IP Address:   192.168.65.15
+   Manufacturer: HP
+   Product:      HP Elite Slice G2 MS SRS Audio Ready
+
+💻 CPU INFO:
+   Model:        Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz
+   Cores:        4
+
+💾 DISK:
+   Disks:        2 physical disk(s)
+
+🌐 NETWORK INTERFACES:
+   Count:        2 interface(s)
+
+✓ Data collection successful!
+  Run without --dry-run to submit this data to the API
+```
+
+**Dry run with full JSON output:**
+```bash
+python agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN --dry-run --verbose
+```
+
+**Submit data to API:**
+```bash
+python agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN
+```
+
+**Submit with verbose output:**
+```bash
+python agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN --verbose
+```
+
+### Agent Example Output
+```json
+{
+  "hostname": "ubuntu-hp-g2",
+  "ip_address": "192.168.65.15",
+  "nic_mac": "84:3a:5b:10:ce:5f",
+  "data_source": "api",
+  "status": "active",
+  "os": "Linux",
+  "os_version": "6.8.0-71-generic",
+  "kernel": "#71-Ubuntu SMP PREEMPT_DYNAMIC",
+  "cpu": "Intel(R) Core(TM) i5-7500T CPU @ 2.70GHz",
+  "core_count": 4,
+  "total_mem": 15,
+  "disk_count": 2,
+  "disk_details": [
+    {"name": "sda", "size": "465.8G", "type": "disk"},
+    {"name": "nvme0n1", "size": "476.9G", "type": "disk"}
+  ],
+  "manufacture": "HP",
+  "product_name": "HP Elite Slice G2 MS SRS Audio Ready"
+}
+```
+
+### Automated Data Collection
+For automated server inventory updates, schedule the agent with cron:
+
+```bash
+# Run agent every hour
+0 * * * * /usr/bin/python3 /path/to/agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN
+```
 
 ## UI/UX Design Patterns
 
@@ -204,7 +404,14 @@ NexHub follows consistent design patterns documented in [`DESIGN_CONFIG.md`](ove
 
 ## Version History
 
-### v0.0.2 (Current)
+### v0.0.3 (Current)
+- REST API with Django REST Framework
+- Token-based authentication
+- API endpoints for Server, Category, Tag, Subnet
+- Agent script for automated data collection
+- Bulk operations support
+
+### v0.0.2
 - Subnet CRUD with IP Pool management
 - Dynamic From/To input fields for Static IP Pools
 - Auto-calculated DHCP pools

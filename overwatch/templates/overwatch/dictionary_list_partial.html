@@ -40,14 +40,6 @@
                             data-form-url="{% url 'overwatch:dictionary_edit' item.pk %}"
                             class="dict-modal-open font-medium text-blue-700 hover:underline"
                         >Edit</a>
-                        <button
-                            type="button"
-                            class="font-medium text-red-600 hover:underline dict-delete-btn"
-                            data-delete-url="{% url 'overwatch:dictionary_delete' item.pk %}"
-                            data-label="{{ item.original_keyword }}"
-                        >
-                            Delete
-                        </button>
                     </td>
                 </tr>
                 {% empty %}

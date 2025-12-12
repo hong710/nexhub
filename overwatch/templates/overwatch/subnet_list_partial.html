@@ -30,7 +30,11 @@
                             {{ item.name }}
                         </a>
                     </td>
-                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200 font-mono">{{ item.network }}</td>
+                    <td class="px-4 py-2 text-[12px] text-slate-700 border-r border-slate-200 font-mono">
+                        <a href="{% url 'overwatch:ipam_list' %}?subnet={{ item.pk }}" class="text-blue-700 hover:text-blue-900 hover:underline">
+                            {{ item.network }}
+                        </a>
+                    </td>
                     <td class="px-4 py-2 text-[12px] text-slate-600 border-r border-slate-200 text-center">
                         {% if item.vlan_id %}
                         <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
