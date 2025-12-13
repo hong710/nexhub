@@ -27,6 +27,60 @@
 - **Tags**: Flexible tagging system with color coding
 - **Categories**: Organize servers into logical categories
 
+### Agent Push API (Shared Key)
+- **Single endpoint**: POST `/overwatch/api/agent/data/`
+- **Auth**: Shared API key via `Authorization: Bearer <token>` header (configured in `settings.AGENT_API_KEY`)
+- **Data**: Upserts a `Server` using `uuid` → `nic_mac` → `ip_address` → `hostname` cascade matching
+- **Agent script**: `agent_linux.py` collects system info and submits via HTTPS (see [agent/README_AGENT.md](agent/README_AGENT.md))
+- **Bulk deployment**: Use `agent/tools/deploy_nexhub_agents.sh` to install agent + shared key on 100+ servers via SSH
+
+#### Quick Start (Agent Setup)
+
+**1. Set the shared API key** in [nexhub/settings.py](nexhub/settings.py):
+```python
+AGENT_API_KEY = "your-strong-secret-key-here"  # Change this!
+```
+
+**2. Deploy to a single server** (manual):
+```bash
+# Copy agent script
+scp agent/agent_linux.py user@target-host:/tmp/
+ssh user@target-host 'sudo mv /tmp/agent_linux.py /usr/local/bin/ && sudo chmod +x /usr/local/bin/agent_linux.py'
+
+# Store shared key securely
+ssh user@target-host "echo 'your-strong-secret-key-here' | sudo tee /etc/nexhub/agent.key >/dev/null && sudo chmod 600 /etc/nexhub/agent.key"
+
+# Add cron job (hourly)
+ssh user@target-host "echo '0 * * * * /usr/bin/python3 /usr/local/bin/agent_linux.py --url https://nexhub.example.com --api-key \$(cat /etc/nexhub/agent.key) >> /var/log/nexhub-agent-cron.log 2>&1' | sudo crontab -"
+
+# Test immediately
+ssh user@target-host "/usr/bin/python3 /usr/local/bin/agent_linux.py --url https://nexhub.example.com --api-key \$(cat /etc/nexhub/agent.key)"
+```
+
+**3. Bulk deploy to 100+ servers** (automated):
+```bash
+# Create inventory file
+cat > agent/tools/servers.txt <<EOF
+server1.example.com
+user@server2.example.com
+10.0.0.50
+EOF
+
+# Set shared key and deploy
+export AGENT_API_KEY="your-strong-secret-key-here"
+agent/tools/deploy_nexhub_agents.sh -f agent/tools/servers.txt -u https://nexhub.example.com
+
+# Verify deployment
+tail -f /var/log/nexhub-agent-cron.log  # on any target host
+```
+
+**Notes:**
+- Same API key for all agents (internal-only security model)
+- Key stored in `/etc/nexhub/agent.key` on target hosts (mode 600)
+- Agents run hourly via cron by default
+- Server matching: `uuid` (preferred) → `nic_mac` → `ip_address` → `hostname` → auto-generated UUID
+- No per-agent identity or rotation (simplicity over granular tracking)
+
 ## Technology Stack
 
 - **Backend**: Django 6.0 (Python 3.12)
@@ -311,6 +365,45 @@ python3 --version  # Verify Python 3.6 or higher
 ```bash
 python agent_linux.py --url http://nexhub.example.com --token YOUR_TOKEN --dry-run
 ```
+
+## Minimal Agent Push (API key)
+
+Use this when you just need a simple one-way push without user tokens.
+
+1. Create or rotate a key (prints once):
+```bash
+python manage.py create_agent my-hostname
+# optionally supply your own key
+python manage.py create_agent my-hostname --api-key YOUR_KEY --force
+```
+
+2. Revoke a key:
+```bash
+python manage.py revoke_agent my-hostname
+```
+
+3. Send data:
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{
+    "api_key": "YOUR_KEY",
+    "uuid": "optional-uuid",
+    "hostname": "my-hostname",
+    "ip_address": "10.0.0.5",
+    "os": "Ubuntu",
+    "os_version": "24.04",
+    "cpu": "Intel",
+    "core_count": 8,
+    "total_mem": 32
+  }' \
+  http://localhost:8000/overwatch/api/agent/data/
+```
+
+Notes:
+- `uuid` is preferred for stable identity; falls back to `hostname` when missing.
+- Fields omitted remain unchanged on the server record.
+- Endpoint returns `{"status": "ok", "server_id": <id>}` on success.
 
 This will display a formatted summary of collected system information:
 ```

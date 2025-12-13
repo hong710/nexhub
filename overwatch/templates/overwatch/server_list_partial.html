@@ -31,7 +31,7 @@
                 {% for server in page_obj %}
                 <tr class="hover:bg-blue-50" data-row>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 text-center w-12">
-                        {{ forloop.counter|add:page_offset }}
+                        {{ forloop.counter }}
                     </td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-ip_address whitespace-nowrap" data-col="ip_address">{{ server.ip_address|default:"—" }}</td>
                     <td class="px-2 py-1.5 text-[12px] text-slate-700 border-r border-slate-200 col-bmc_ip whitespace-nowrap" data-col="bmc_ip">{{ server.bmc_ip|default:"—" }}</td>
@@ -74,74 +74,7 @@
         </table>
     </div>
 
-    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 border-t border-slate-200 bg-white px-3 py-3 flex-shrink-0">
-        <div class="flex flex-wrap items-center gap-3">
-            <div id="page-status" class="text-sm text-slate-600">
-                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
-            </div>
-            <div class="flex items-center gap-2">
-                <a
-                    href="?page=1&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link"
-                    data-nav="first"
-                >&laquo;</a>
-                {% if page_obj.has_previous %}
-                <a
-                    href="?page={{ page_obj.previous_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link"
-                    data-nav="prev"
-                >&lsaquo;</a>
-                {% else %}
-                <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70 js-page-link" data-nav="prev">&lsaquo;</span>
-                {% endif %}
-                <div id="page-numbers" class="inline-flex items-center gap-1">
-                    {% for p in elided_pages %}
-                        {% if p == '…' %}
-                            <span class="px-2 py-2 text-sm text-slate-500">…</span>
-                        {% elif p == page_obj.number %}
-                            <span class="px-3 py-2 text-sm bg-blue-600 text-white rounded border border-blue-600 js-page-link" data-page="{{ p }}">{{ p }}</span>
-                        {% else %}
-                            <a
-                                href="?page={{ p }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                                class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link"
-                                data-page="{{ p }}"
-                            >{{ p }}</a>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-                {% if page_obj.has_next %}
-                <a
-                    href="?page={{ page_obj.next_page_number }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link"
-                    data-nav="next"
-                >&rsaquo;</a>
-                {% else %}
-                <span class="px-3 py-2 text-sm bg-slate-100 border border-slate-200 rounded text-slate-400 opacity-70 js-page-link" data-nav="next">&rsaquo;</span>
-                {% endif %}
-                <a
-                    href="?page={{ page_obj.paginator.num_pages }}&page_size={{ page_size }}{% if query %}&q={{ query|urlencode }}{% endif %}"
-                    class="px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link"
-                    data-nav="last"
-                >&raquo;</a>
-            </div>
-            <label class="inline-flex items-center gap-2 text-sm text-slate-700">
-                <span>Records per page</span>
-                <select
-                    id="page-size-select"
-                    name="page_size"
-                    form="filters"
-                    class="rounded border-slate-300 text-sm focus:border-blue-600 focus:ring-blue-600 disabled:bg-slate-100 disabled:text-slate-400"
-                    {% if page_size_disabled %}disabled{% endif %}
-                >
-                    {% if page_size not in page_sizes %}
-                    <option value="{{ page_size }}" selected>{{ page_size }}</option>
-                    {% endif %}
-                    {% for size in page_sizes %}
-                    <option value="{{ size }}" {% if page_size == size %}selected{% endif %}>{{ size }}</option>
-                    {% endfor %}
-                </select>
-            </label>
-        </div>
+    <div class="border-t border-slate-200 bg-white px-3 py-3 flex-shrink-0">
         <div
             id="row-count"
             data-total="{{ total_all_count }}"

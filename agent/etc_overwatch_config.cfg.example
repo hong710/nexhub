@@ -1,0 +1,16 @@
+# Overwatch Agent Configuration
+#
+# This file contains the endpoint URL and base64-encoded API key.
+# The API key is intentionally base64-encoded (not encrypted) to prevent
+# accidental exposure in plain text while remaining easily readable by the runner.
+#
+# To encode a new API key:
+#   echo -n "your-real-api-key-here" | base64
+#
+
+# NexHub/Overwatch API endpoint (HTTPS recommended in production)
+ENDPOINT=https://nexhub.example.com
+
+# Base64-encoded shared API key
+# Example: real key "test-shared-key-1765595205" encodes to:
+API_KEY_ENCODED=dGVzdC1zaGFyZWQta2V5LTE3NjU1OTUyMDU=

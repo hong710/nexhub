@@ -1,0 +1,5 @@
+# One target per line. Lines starting with # are ignored.
+# You can specify either host, or user@host.
+ubuntu-host-01
+admin@10.0.0.12
+edge-node-03

@@ -6,12 +6,16 @@ from typing import Any
 from django import forms
 from django.core.paginator import Paginator
 from django.core.management import call_command
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.conf import settings
+import uuid as uuidlib
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
@@ -220,28 +224,9 @@ def server_list(request: HttpRequest) -> HttpResponse:
 
     servers = servers.order_by("hostname")
 
-    page_size_input = request.GET.get("page_size")
-    try:
-        requested_page_size = int(page_size_input) if page_size_input else 25
-    except ValueError:
-        requested_page_size = 25
-    if requested_page_size not in [25, 50, 100, 200]:
-        requested_page_size = 25
-
-    page_sizes = [25, 50, 100, 200]
     filtered_count = servers.count()
-
-    page_size_disabled = False
-    effective_page_size = requested_page_size
-    if filtered_count < requested_page_size:
-        effective_page_size = max(filtered_count, 1)
-        page_size_disabled = True
-
-    paginator = Paginator(servers, effective_page_size)
-    page_number = request.GET.get("page")
-    page_obj = paginator.get_page(page_number)
-    elided_pages = paginator.get_elided_page_range(number=page_obj.number, on_each_side=1, on_ends=1)
-    page_offset = page_obj.start_index() - 1 if filtered_count else 0
+    page_obj = list(servers)
+    page_offset = 0
 
     tag_options = ["__NO_TAG__"] + list(Tag.objects.order_by("name").values_list("name", flat=True))
 
@@ -286,13 +271,13 @@ def server_list(request: HttpRequest) -> HttpResponse:
         "page_obj": page_obj,
         "query": query or "",
         "table_headers": table_headers,
-        "page_size": effective_page_size,
-        "page_sizes": page_sizes,
-        "elided_pages": elided_pages,
+        "page_size": filtered_count or 0,
+        "page_sizes": [],
+        "elided_pages": [],
         "col_toggles": col_toggles,
         "filtered_count": filtered_count,
         "total_all_count": total_all_count,
-        "page_size_disabled": page_size_disabled,
+        "page_size_disabled": True,
         "page_offset": page_offset,
         "tag_options": tag_options,
         "tags_filter": tags_filter,
@@ -1571,6 +1556,91 @@ def server_note_delete(request: HttpRequest, pk: int, note_pk: int) -> HttpRespo
         if request.user.is_authenticated and request.user == note.updated_by:
             note.delete()
     return redirect("overwatch:server_detail", pk=pk)
+
+
+@csrf_exempt
+@require_POST
+def agent_data_push(request: HttpRequest) -> JsonResponse:
+    """Minimal agent data push endpoint secured by shared API key via Bearer token."""
+
+    # Check Authorization: Bearer <API_KEY> header
+    auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+    if not auth_header.startswith("Bearer "):
+        return JsonResponse({"detail": "Missing or invalid Authorization header"}, status=401)
+    
+    provided_key = auth_header[7:].strip()  # Remove "Bearer " prefix
+    expected_key = getattr(settings, "AGENT_API_KEY", "")
+    
+    if not expected_key or provided_key != expected_key:
+        return JsonResponse({"detail": "Invalid API key"}, status=401)
+
+    try:
+        payload = json.loads(request.body.decode()) if request.body else {}
+    except json.JSONDecodeError:
+        return JsonResponse({"detail": "Invalid JSON payload"}, status=400)
+
+    hostname = payload.get("hostname")
+    if not hostname:
+        return JsonResponse({"detail": "hostname is required"}, status=400)
+
+    # Robust identification to handle duplicate hostnames
+    provided_uuid = (payload.get("uuid") or "").strip()
+    nic_mac = (payload.get("nic_mac") or "").strip() or None
+    ip_addr = (payload.get("ip_address") or "").strip() or None
+
+    server = None
+    created = False
+
+    # 1) Prefer UUID if provided
+    if provided_uuid:
+        server = Server.objects.filter(uuid=provided_uuid).first()
+        if not server:
+            # Create new with this UUID
+            server = Server(uuid=provided_uuid, hostname=hostname, data_source="api")
+            created = True
+    # 2) Else, try NIC MAC if exactly one match
+    if server is None and nic_mac:
+        qs = Server.objects.filter(nic_mac=nic_mac)
+        if qs.count() == 1:
+            server = qs.first()
+    # 3) Else, try IP if exactly one match
+    if server is None and ip_addr:
+        qs = Server.objects.filter(ip_address=ip_addr)
+        if qs.count() == 1:
+            server = qs.first()
+    # 4) Else, try hostname only if exactly one match; otherwise create new
+    if server is None:
+        qs = Server.objects.filter(hostname=hostname)
+        if qs.count() == 1:
+            server = qs.first()
+        else:
+            # Ambiguous or none: create new. Generate UUID if not provided.
+            gen_uuid = provided_uuid or str(uuidlib.uuid4())
+            server = Server(uuid=gen_uuid, hostname=hostname, data_source="api")
+            created = True
+
+    # Update server fields when provided
+    updates = {
+        "hostname": hostname,
+        "ip_address": payload.get("ip_address") or server.ip_address,
+        "bmc_ip": payload.get("bmc_ip") or server.bmc_ip,
+        "nic_mac": payload.get("nic_mac") or server.nic_mac,
+        "os": payload.get("os") or server.os,
+        "os_version": payload.get("os_version") or server.os_version,
+        "kernel": payload.get("kernel") or server.kernel,
+        "cpu": payload.get("cpu") or server.cpu,
+        "core_count": payload.get("core_count") or server.core_count,
+        "total_mem": payload.get("total_mem") or server.total_mem,
+        "disk_count": payload.get("disk_count") or server.disk_count,
+        "device_type": payload.get("device_type") or server.device_type,
+    }
+    for field, value in updates.items():
+        setattr(server, field, value)
+
+    server.data_source = "api"
+    server.save()
+
+    return JsonResponse({"status": "ok", "server_id": server.id})
 
 
 # =============================================================================

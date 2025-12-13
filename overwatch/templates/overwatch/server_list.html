@@ -18,7 +18,6 @@
                 hx-get="."
                 hx-target="#server-table-wrapper"
                 hx-trigger="keyup changed delay:250ms from:#search, submit"
-                hx-include="#page-size-select"
                 hx-swap="innerHTML"
                 class="flex items-center gap-2"
             >
@@ -30,7 +29,6 @@
                     placeholder="Global search"
                     class="w-72 rounded-lg border-slate-300 focus:border-blue-600 focus:ring-blue-600 shadow-sm text-sm"
                 />
-                <input type="hidden" name="page_size" value="{{ page_size }}">
             </form>
         </div>
         <div class="flex flex-wrap items-center gap-2 text-sm text-slate-700 px-1">
@@ -313,7 +311,6 @@
         });
         updateFilterIndicators();
         renumberRows();
-        refreshPagination();
     }
 
     function updateVisibleCount() {
@@ -329,16 +326,10 @@
 
     function renumberRows() {
         const rows = Array.from(document.querySelectorAll('tbody tr[data-row]')).filter((r) => !r.classList.contains('hidden'));
-        const hasFilters = Object.values(window.__activeFilterState || {}).some((set) => set && set.size > 0);
-        if (hasFilters) {
-            const pageSize = window.__clientPageSize || rows.length || 1;
-            const page = window.__clientPage || 1;
-            const startIndex = (page - 1) * pageSize;
-            rows.forEach((row, idx) => {
-                const numCell = row.querySelector('td');
-                if (numCell) numCell.textContent = startIndex + idx + 1;
-            });
-        }
+        rows.forEach((row, idx) => {
+            const numCell = row.querySelector('td');
+            if (numCell) numCell.textContent = idx + 1;
+        });
         updateVisibleCount();
     }
 
@@ -393,109 +384,6 @@
         return Array.from(document.querySelectorAll('tbody tr[data-row]')).filter((r) => !r.classList.contains('hidden'));
     }
 
-    function applyClientPaging() {
-        if (!isFilterActive()) return;
-        const rows = getVisibleRows();
-        const pageSize = window.__clientPageSize || rows.length || 1;
-        const page = Math.max(1, Math.min(window.__clientPage || 1, Math.ceil((rows.length || 1) / pageSize)));
-        window.__clientPage = page;
-        const start = (page - 1) * pageSize;
-        const end = start + pageSize;
-        rows.forEach((row, idx) => {
-            if (idx >= start && idx < end) {
-                row.classList.remove('hidden-by-page');
-            } else {
-                row.classList.add('hidden-by-page');
-            }
-        });
-        renumberRows();
-    }
-
-    function refreshPagination() {
-        const pageNumbers = document.getElementById('page-numbers');
-        const pageStatus = document.getElementById('page-status');
-        const pageSizeSelect = document.getElementById('page-size-select');
-        if (!pageNumbers || !pageStatus || !pageSizeSelect) return;
-
-        if (!isFilterActive()) {
-            // restore any option disabling
-            Array.from(pageSizeSelect.options).forEach((opt) => (opt.disabled = false));
-            pageSizeSelect.disabled = false;
-            return;
-        }
-
-        const rows = getVisibleRows();
-        const count = rows.length;
-        const allowedSizes = Array.from(pageSizeSelect.options).map((o) => parseInt(o.value, 10)).filter((v) => !isNaN(v));
-        let selectedSize = parseInt(pageSizeSelect.value, 10);
-        if (!selectedSize || selectedSize > count) {
-            selectedSize = count || allowedSizes[0] || 25;
-        }
-
-        // disable options larger than count
-        Array.from(pageSizeSelect.options).forEach((opt) => {
-            const val = parseInt(opt.value, 10);
-            opt.disabled = count > 0 ? val > count : false;
-        });
-        pageSizeSelect.value = selectedSize;
-        pageSizeSelect.disabled = count <= Math.min(...allowedSizes);
-
-        window.__clientPageSize = selectedSize;
-        const totalPages = Math.max(1, Math.ceil((count || 1) / selectedSize));
-        if (!window.__clientPage || window.__clientPage > totalPages) {
-            window.__clientPage = 1;
-        }
-
-        // rebuild page numbers
-        pageNumbers.innerHTML = "";
-        for (let p = 1; p <= totalPages; p++) {
-            const el = document.createElement(p === window.__clientPage ? 'span' : 'a');
-            el.textContent = p;
-            el.dataset.page = p;
-            el.className = p === window.__clientPage
-                ? "px-3 py-2 text-sm bg-blue-600 text-white rounded border border-blue-600 js-page-link"
-                : "px-3 py-2 text-sm bg-white border border-slate-200 rounded hover:bg-blue-50 text-slate-800 js-page-link";
-            el.href = "#";
-            el.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                window.__clientPage = p;
-                applyClientPaging();
-                refreshPagination();
-            });
-            pageNumbers.appendChild(el);
-        }
-
-        // update status text
-        pageStatus.textContent = `Page ${window.__clientPage} of ${totalPages}`;
-
-        // update nav buttons
-        const navMap = {
-            first: 1,
-            prev: Math.max(1, window.__clientPage - 1),
-            next: Math.min(totalPages, window.__clientPage + 1),
-            last: totalPages,
-        };
-        document.querySelectorAll('.js-page-link[data-nav]').forEach((el) => {
-            const nav = el.dataset.nav;
-            const target = navMap[nav];
-            const disabled = (nav === 'first' && window.__clientPage === 1) ||
-                (nav === 'prev' && window.__clientPage === 1) ||
-                (nav === 'next' && window.__clientPage === totalPages) ||
-                (nav === 'last' && window.__clientPage === totalPages);
-            el.classList.toggle('pointer-events-none', disabled);
-            el.classList.toggle('opacity-50', disabled);
-            el.addEventListener('click', (ev) => {
-                ev.preventDefault();
-                if (disabled) return;
-                window.__clientPage = target;
-                applyClientPaging();
-                refreshPagination();
-            });
-        });
-
-        applyClientPaging();
-    }
-
     function persistColumnToggles() {
         const toggles = document.querySelectorAll('[data-toggle-col]');
         const state = {};
@@ -543,32 +431,12 @@
         attachTableReset();
         initColumnFilters();
         updateFilterIndicators();
-        // page size select submit form
-        const pageSizeSelect = document.getElementById('page-size-select');
-        if (pageSizeSelect) {
-            pageSizeSelect.addEventListener('change', (e) => {
-                if (isFilterActive()) {
-                    window.__clientPageSize = parseInt(pageSizeSelect.value, 10) || window.__clientPageSize;
-                    window.__clientPage = 1;
-                    refreshPagination();
-                    applyClientPaging();
-                } else {
-                    const form = document.getElementById('filters');
-                    if (form) form.submit();
-                }
-            });
-        }
         renumberRows();
-        refreshPagination();
     }
 
     document.addEventListener('change', (event) => {
         if (event.target.matches('[data-toggle-col]')) {
             applyColumnToggles();
-            if (isFilterActive()) {
-                window.__clientPage = 1;
-                refreshPagination();
-            }
         }
     });
 

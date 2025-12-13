@@ -7,7 +7,11 @@ to the Overwatch API. It's designed to be run on servers to automatically popula
 the Overwatch inventory.
 
 Usage:
+    # Full REST API (token auth)
     python agent_linux.py --url http://nexhub.example.com --token YOUR_API_TOKEN
+
+    # Minimal agent push (API key auth)
+    python agent_linux.py --url http://nexhub.example.com --api-key YOUR_AGENT_KEY
 
 Requirements:
     - Python 3.6+ (standard library only, no external dependencies)
@@ -17,6 +21,7 @@ Requirements:
 import argparse
 import configparser
 import json
+import os
 import platform
 import socket
 import subprocess
@@ -625,13 +630,17 @@ class SystemCollector:
 class OverwatchClient:
     """Client for interacting with Overwatch API using urllib."""
 
-    def __init__(self, base_url: str, token: str):
+    def __init__(self, base_url: str, token: str | None = None, api_key: str | None = None):
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.api_key = api_key
         self.headers = {
-            "Authorization": f"Token {token}",
             "Content-Type": "application/json",
         }
+        if token:
+            self.headers["Authorization"] = f"Token {token}"
+        elif api_key:
+            self.headers["Authorization"] = f"Bearer {api_key}"
 
     def _make_request(self, url: str, method: str = "GET", data: dict[str, Any] | None = None) -> dict[str, Any]:
         """Make HTTP request using urllib."""
@@ -723,6 +732,14 @@ class OverwatchClient:
         # Server doesn't exist, create it
         return self._make_request(url, method="POST", data=data)
 
+    def submit_agent_push(self, data: dict[str, Any]) -> dict[str, Any]:
+        """Submit data to minimal agent push endpoint using Bearer auth."""
+        if not self.api_key:
+            raise ValueError("api_key is required")
+
+        url = f"{self.base_url}/overwatch/api/agent/data/"
+        return self._make_request(url, method="POST", data=data)
+
 
 def write_log(log_file: str, entry: dict[str, Any]) -> None:
     """Write log entry to file."""
@@ -739,7 +756,7 @@ def write_log(log_file: str, entry: dict[str, Any]) -> None:
 def main():
     parser = argparse.ArgumentParser(description="Overwatch Agent - System Information Collector")
     parser.add_argument("--url", required=True, help="Overwatch base URL (e.g., http://localhost:8000)")
-    parser.add_argument("--token", required=True, help="API authentication token")
+    parser.add_argument("--api-key", required=True, help="Shared API key for agent data submission")
     parser.add_argument("--dry-run", action="store_true", help="Print collected data without submitting")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
     parser.add_argument("--log-file", default="/var/log/overwatch-agent.log", help="Log file path (default: /var/log/overwatch-agent.log)")
@@ -820,6 +837,17 @@ def main():
             print("=" * 80)
             print(json.dumps(data, indent=2))
         
+        # Save payload to /var/log/overwatch/agent_payload.json for inspection
+        payload_log_dir = "/var/log/overwatch"
+        payload_log_file = os.path.join(payload_log_dir, "agent_payload.json")
+        try:
+            os.makedirs(payload_log_dir, exist_ok=True)
+            with open(payload_log_file, "w") as f:
+                json.dump(data, f, indent=2)
+            print(f"\n[+] Payload saved to: {payload_log_file}")
+        except Exception as e:
+            print(f"\n[!] Warning: Could not save payload to {payload_log_file}: {e}")
+        
         print("\n" + "=" * 80)
         print("✓ Data collection successful!")
         print("  Run without --dry-run to submit this data to the API")
@@ -836,11 +864,12 @@ def main():
     # Submit to API
     print(f"\nSubmitting to {args.url}...")
     try:
-        client = OverwatchClient(args.url, args.token)
-        result = client.submit_server(data)
+        client = OverwatchClient(args.url, api_key=args.api_key)
+        result = client.submit_agent_push(data)
+
         log_entry["status"] = "success"
         log_entry["action"] = "submit"
-        log_entry["server_id"] = result.get("id")
+        log_entry["server_id"] = result.get("server_id")
         log_entry["result"] = result
         write_log(args.log_file, log_entry)
         print("\n✓ Successfully submitted server data")

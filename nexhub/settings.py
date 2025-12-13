@@ -17,6 +17,10 @@ DEBUG = True
 
 ALLOWED_HOSTS: list[str] = []
 
+# Agent shared API key for minimal push endpoint (internal use only)
+# Change this to a strong random value and keep it secret
+AGENT_API_KEY = "test-shared-key-1765595205"
+
 
 # Application definition
 

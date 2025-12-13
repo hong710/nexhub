@@ -40,4 +40,5 @@ urlpatterns = [
     path("ipam/reserve/", views.ipam_reserve, name="ipam_reserve"),
     path("ipam/my-reserved-ips/", views.ipam_my_reserved_ips, name="ipam_my_reserved_ips"),
     path("ipam/release/", views.ipam_release_ips, name="ipam_release_ips"),
+    path("overwatch/api/agent/data/", views.agent_data_push, name="agent_data_push"),
 ]

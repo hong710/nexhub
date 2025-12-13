@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+#
+# overwatch-runner - Simple cron-friendly wrapper for agent_linux.py
+#
+# Reads /etc/overwatch/config.cfg, decodes the base64 API key, executes agent_linux.py.
+# Supports --dry-run (-d) to save JSON locally without sending over network.
+#
+# Usage:
+#   overwatch-runner [--dry-run | -d]
+#   CRON: 0 * * * * /usr/local/bin/overwatch-runner
+#
+
+set -euo pipefail
+
+DRY_RUN=false
+CONFIG_FILE="/etc/overwatch/config.cfg"
+AGENT_SCRIPT="/etc/overwatch/agent_linux.py"
+LOG_DIR="/var/log/overwatch"
+PAYLOAD_FILE="${LOG_DIR}/agent_payload.json"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run|-d)
+            DRY_RUN=true
+            shift
+            ;;
+        *)
+            echo "Usage: $0 [--dry-run|-d]" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Validate config file exists
+if [[ ! -f "${CONFIG_FILE}" ]]; then
+    echo "Error: Config file not found: ${CONFIG_FILE}" >&2
+    exit 1
+fi
+
+# Validate agent script exists
+if [[ ! -f "${AGENT_SCRIPT}" ]]; then
+    echo "Error: Agent script not found: ${AGENT_SCRIPT}" >&2
+    exit 1
+fi
+
+# Source config file
+# Expected format:
+#   ENDPOINT=https://nexhub.example.com
+#   API_KEY_ENCODED=YWJjZGVmZ2hpamtsbW5vcA==
+source "${CONFIG_FILE}"
+
+# Validate required config variables
+if [[ -z "${ENDPOINT:-}" ]]; then
+    echo "Error: ENDPOINT not set in ${CONFIG_FILE}" >&2
+    exit 1
+fi
+
+if [[ -z "${API_KEY_ENCODED:-}" ]]; then
+    echo "Error: API_KEY_ENCODED not set in ${CONFIG_FILE}" >&2
+    exit 1
+fi
+
+# Decode base64 API key
+API_KEY=$(echo "${API_KEY_ENCODED}" | base64 -d)
+
+# Create log directory if it doesn't exist
+mkdir -p "${LOG_DIR}"
+
+# Build agent command
+AGENT_CMD=(
+    python3
+    "${AGENT_SCRIPT}"
+    --url "${ENDPOINT}"
+    --api-key "${API_KEY}"
+)
+
+# Add dry-run flag if specified
+if [[ "${DRY_RUN}" == "true" ]]; then
+    AGENT_CMD+=(--dry-run)
+    echo "Running in dry-run mode; payload will be saved to ${PAYLOAD_FILE}"
+    # Run agent in dry-run mode (console output to stderr, JSON written to payload file by agent)
+    "${AGENT_CMD[@]}" >/dev/null 2>&1 || {
+        echo "Error: Agent failed" >&2
+        exit 1
+    }
+    if [[ -f "${PAYLOAD_FILE}" ]]; then
+        echo "✓ Dry-run payload saved to ${PAYLOAD_FILE}"
+    fi
+else
+    # Normal operation: run agent and send data
+    "${AGENT_CMD[@]}" >> "${LOG_DIR}/runner.log" 2>&1 || {
+        echo "Error: Agent failed" >&2
+        exit 1
+    }
+fi
+
+exit 0
