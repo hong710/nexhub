@@ -213,7 +213,7 @@
                     </div>
                 </div>
 
-                <!-- Hardware Details (JSON) -->
+                <!-- Hardware Details (JSON) - Flowbite Tabs -->
                 <div class="bg-white rounded-lg border border-slate-200 shadow-sm">
                     <div class="px-4 py-2.5 border-b border-violet-200 bg-gradient-to-r from-violet-100 to-purple-100">
                         <h2 class="text-xs font-semibold text-violet-800 uppercase tracking-wide flex items-center gap-2">
@@ -223,79 +223,404 @@
                             Hardware Details
                         </h2>
                     </div>
+                    
+                    <!-- Tab Navigation -->
+                    <div class="flex border-b border-slate-200 bg-slate-50 overflow-x-auto">
+                        <!-- Memory Tab -->
+                        {% if mem_details_pretty %}
+                        <button class="hw-tab-btn active px-4 py-2.5 text-sm font-medium text-slate-700 border-b-2 border-violet-500 hover:text-violet-700 transition-colors flex items-center gap-2 whitespace-nowrap" data-tab="memory">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                            Memory
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Disks Tab -->
+                        {% if disk_details_pretty %}
+                        <button class="hw-tab-btn px-4 py-2.5 text-sm font-medium text-slate-700 border-b-2 border-transparent hover:border-slate-300 hover:text-slate-900 transition-colors flex items-center gap-2 whitespace-nowrap" data-tab="disks">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
+                            </svg>
+                            Disks
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Network Interfaces Tab -->
+                        {% if network_interfaces_pretty %}
+                        <button class="hw-tab-btn px-4 py-2.5 text-sm font-medium text-slate-700 border-b-2 border-transparent hover:border-slate-300 hover:text-slate-900 transition-colors flex items-center gap-2 whitespace-nowrap" data-tab="network">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
+                            </svg>
+                            Network
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Expansion Slots Tab -->
+                        {% if expansion_slots_pretty %}
+                        <button class="hw-tab-btn px-4 py-2.5 text-sm font-medium text-slate-700 border-b-2 border-transparent hover:border-slate-300 hover:text-slate-900 transition-colors flex items-center gap-2 whitespace-nowrap" data-tab="expansion">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                            </svg>
+                            Expansion Slots
+                        </button>
+                        {% endif %}
+                        
+                        <!-- Accelerators Tab -->
+                        <button class="hw-tab-btn px-4 py-2.5 text-sm font-medium text-slate-700 border-b-2 border-transparent hover:border-slate-300 hover:text-slate-900 transition-colors flex items-center gap-2 whitespace-nowrap" data-tab="accelerators">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            Accelerators
+                        </button>
+                    </div>
+                    
+                    <!-- Tab Content -->
                     <div class="p-4">
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                            <!-- Network Interfaces (2 columns, 2 rows) -->
-                            {% if network_interfaces_pretty %}
-                            <div class="md:col-span-2 md:row-span-2 h-80 flex flex-col overflow-hidden">
-                                <p class="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-blue-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
-                                    </svg>
-                                    Network Interfaces
-                                </p>
-                                <pre class="flex-1 bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-auto font-mono leading-relaxed whitespace-pre">{{ network_interfaces_pretty }}</pre>
-                            </div>
-                            {% endif %}
-
-                            <!-- Expansion Slots (2 columns, 2 rows) -->
-                            {% if expansion_slots_pretty %}
-                            <div class="md:col-span-2 md:row-span-2 h-80 flex flex-col overflow-hidden">
-                                <p class="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                                    </svg>
-                                    Expansion Slots
-                                </p>
-                                <pre class="flex-1 bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-auto font-mono leading-relaxed whitespace-pre">{{ expansion_slots_pretty }}</pre>
-                            </div>
-                            {% endif %}
-
-                            <!-- Memory (1x1) -->
-                            {% if mem_details_pretty %}
-                            <div class="h-80 flex flex-col overflow-hidden">
-                                <p class="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                                    </svg>
-                                    Memory
-                                </p>
-                                <pre class="flex-1 bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-auto font-mono leading-relaxed whitespace-pre">{{ mem_details_pretty }}</pre>
-                            </div>
-                            {% endif %}
-
-                            <!-- Disk (1x1) -->
-                            {% if disk_details_pretty %}
-                            <div class="h-80 flex flex-col overflow-hidden">
-                                <p class="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
-                                    </svg>
-                                    Disks
-                                </p>
-                                <pre class="flex-1 bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-auto font-mono leading-relaxed whitespace-pre">{{ disk_details_pretty }}</pre>
-                            </div>
-                            {% endif %}
-
-                            <!-- Accelerator (2x1) - Always displayed -->
-                            <div class="md:col-span-2 h-80 flex flex-col overflow-hidden">
-                                <p class="text-xs font-semibold text-slate-600 uppercase mb-2 flex items-center gap-1">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5 text-green-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    Accelerators
-                                </p>
-                                {% if accelerator_pretty %}
-                                <pre class="flex-1 bg-slate-900 text-green-400 rounded-lg p-3 text-xs overflow-auto font-mono leading-relaxed whitespace-pre">{{ accelerator_pretty }}</pre>
-                                {% else %}
-                                <div class="flex-1 bg-slate-50 rounded-lg p-3 text-xs text-slate-500 flex items-center justify-center border border-slate-200">
-                                    Not Available
+                        <!-- Memory Tab Content -->
+                        {% if mem_details_pretty %}
+                        <div class="hw-tab-content active" id="memory-content">
+                            <div class="flex flex-col h-80 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] text-slate-600">
+                                        Total Memory: <span class="font-medium text-slate-900">{{ server.total_mem|default:"—" }} GB</span>
+                                        • Slots populated: <span class="font-medium text-slate-900">{{ server.mem_details|length }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" class="hw-filter-input text-[11px] px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300" placeholder="Filter..." aria-label="Filter memory table" />
+                                        <button type="button" class="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700" onclick="exportHardwareCSV('memory-content','memory.csv')">
+                                            Export CSV
+                                        </button>
+                                    </div>
                                 </div>
-                                {% endif %}
+                                <div class="flex-1 overflow-auto">
+                                    <table class="min-w-full text-xs text-left">
+                                        <thead class="text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-2 border-b border-slate-200">Slot</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Size</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Type</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Speed</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Manufacturer</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Rank</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for m in server.mem_details %}
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ forloop.counter }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700">{{ m.size|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ m.type|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-700">{{ m.speed|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ m.manufacturer|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700">{{ m.rank|default:"—" }}</span></td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="6" class="px-3 py-6 text-center text-slate-500">No memory slot details</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Disks Tab Content -->
+                        {% if disk_details_pretty %}
+                        <div class="hw-tab-content hidden" id="disks-content">
+                            <div class="flex flex-col h-80 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] text-slate-600">
+                                        Physical Disks: <span class="font-medium text-slate-900">{{ server.disk_details|length }}</span>
+                                        {% if server.disk_count %}• Reported Count: <span class="font-medium text-slate-900">{{ server.disk_count }}</span>{% endif %}
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" class="hw-filter-input text-[11px] px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300" placeholder="Filter..." aria-label="Filter disks table" />
+                                        <button type="button" class="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700" onclick="exportHardwareCSV('disks-content','disks.csv')">
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-auto">
+                                    <table class="min-w-full text-xs text-left">
+                                        <thead class="text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-2 border-b border-slate-200">Name</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Size</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Model</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Serial</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Used</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Available</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Usage</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for d in server.disk_details %}
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-3 py-2 border-b border-slate-100 font-mono" title="Physical device name">{{ d.name|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-slate-100 text-slate-700" title="Reported capacity">{{ d.size|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100" title="Model identifier">{{ d.model|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100 font-mono" title="Drive serial number">{{ d.serial|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ d.used|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ d.available|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100" data-usage="{{ d.usage|default:'—' }}"><span class="inline-block px-2 py-0.5 rounded bg-amber-100 text-amber-700" title="Filesystem usage">{{ d.usage|default:"—" }}</span></td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="7" class="px-3 py-6 text-center text-slate-500">No disk details</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Network Interfaces Tab Content -->
+                        {% if network_interfaces_pretty %}
+                        <div class="hw-tab-content hidden" id="network-content">
+                            <div class="flex flex-col h-80 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] text-slate-600">
+                                        Interfaces: <span class="font-medium text-slate-900">{{ server.network_interfaces|length }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" class="hw-filter-input text-[11px] px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300" placeholder="Filter..." aria-label="Filter network table" />
+                                        <button type="button" class="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700" onclick="exportHardwareCSV('network-content','network.csv')">
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-auto">
+                                    <table class="min-w-full text-xs text-left">
+                                        <thead class="text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-2 border-b border-slate-200">PCI Address</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for n in server.network_interfaces %}
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-3 py-2 border-b border-slate-100 font-mono" title="PCI address">{{ n.pci_address|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100" title="Interface description">{{ n.description|default:"—" }}</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="2" class="px-3 py-6 text-center text-slate-500">No network interface details</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Expansion Slots Tab Content -->
+                        {% if expansion_slots_pretty %}
+                        <div class="hw-tab-content hidden" id="expansion-content">
+                            <div class="flex flex-col h-80 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] text-slate-600">
+                                        Expansion Slots: <span class="font-medium text-slate-900">{{ server.expansion_slots|length }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" class="hw-filter-input text-[11px] px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300" placeholder="Filter..." aria-label="Filter expansion slots table" />
+                                        <button type="button" class="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700" onclick="exportHardwareCSV('expansion-content','expansion-slots.csv')">
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-auto">
+                                    <table class="min-w-full text-xs text-left">
+                                        <thead class="text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-2 border-b border-slate-200">Designation</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Type</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Current Usage</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Bus Address</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">ID</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for s in server.expansion_slots %}
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ s.designation|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">{{ s.type|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100"><span class="inline-block px-2 py-0.5 rounded bg-emerald-100 text-emerald-700" title="Current usage state">{{ s.current_usage|default:"—" }}</span></td>
+                                                <td class="px-3 py-2 border-b border-slate-100 font-mono" title="Bus address">{{ s.bus_address|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100">{{ s.id|default:"—" }}</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="5" class="px-3 py-6 text-center text-slate-500">No expansion slot details</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        <!-- Accelerators Tab Content -->
+                        <div class="hw-tab-content hidden" id="accelerators-content">
+                            {% if accelerator_pretty %}
+                            <div class="flex flex-col h-80 overflow-hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="text-[11px] text-slate-600">
+                                        Accelerators: <span class="font-medium text-slate-900">{{ server.accelerator|length }}</span>
+                                    </div>
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" class="hw-filter-input text-[11px] px-2 py-1 rounded border border-slate-200 focus:outline-none focus:ring-1 focus:ring-slate-300" placeholder="Filter..." aria-label="Filter accelerators table" />
+                                        <button type="button" class="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-100 text-slate-700" onclick="exportHardwareCSV('accelerators-content','accelerators.csv')">
+                                            Export CSV
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="flex-1 overflow-auto">
+                                    <table class="min-w-full text-xs text-left">
+                                        <thead class="text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-2 border-b border-slate-200">PCI Address</th>
+                                                <th class="px-3 py-2 border-b border-slate-200">Description</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for a in server.accelerator %}
+                                            <tr class="hover:bg-slate-50">
+                                                <td class="px-3 py-2 border-b border-slate-100 font-mono" title="PCI address">{{ a.pci_address|default:"—" }}</td>
+                                                <td class="px-3 py-2 border-b border-slate-100" title="Accelerator description">{{ a.description|default:"—" }}</td>
+                                            </tr>
+                                            {% empty %}
+                                            <tr>
+                                                <td colspan="2" class="px-3 py-6 text-center text-slate-500">No accelerator details</td>
+                                            </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="h-80 bg-slate-50 rounded-lg p-3 text-xs text-slate-500 flex items-center justify-center border border-slate-200">
+                                Not Available
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
+                
+                <!-- Hardware Tabs JavaScript -->
+                <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    const tabButtons = document.querySelectorAll('.hw-tab-btn');
+                    const tabContents = document.querySelectorAll('.hw-tab-content');
+                    
+                    tabButtons.forEach(button => {
+                        button.addEventListener('click', function() {
+                            const tabId = this.dataset.tab;
+                            
+                            // Remove active state from all buttons
+                            tabButtons.forEach(btn => {
+                                btn.classList.remove('active', 'border-violet-500', 'text-violet-700');
+                                btn.classList.add('border-transparent', 'text-slate-700');
+                            });
+                            
+                            // Hide all tab contents
+                            tabContents.forEach(content => {
+                                content.classList.add('hidden');
+                                content.classList.remove('active');
+                            });
+                            
+                            // Activate clicked tab button
+                            this.classList.add('active', 'border-violet-500', 'text-violet-700');
+                            this.classList.remove('border-transparent', 'text-slate-700');
+                            
+                            // Show corresponding tab content
+                            const contentElement = document.getElementById(tabId + '-content');
+                            if (contentElement) {
+                                contentElement.classList.remove('hidden');
+                                contentElement.classList.add('active');
+                            }
+                        });
+                    });
+                    // Setup per-tab filters
+                    setupHardwareFilters();
+                    // Apply usage color coding for disks
+                    applyDiskUsageColors();
+                });
+                // Filter rows in each hardware tab table
+                function setupHardwareFilters() {
+                    document.querySelectorAll('.hw-tab-content').forEach(content => {
+                        const input = content.querySelector('.hw-filter-input');
+                        const table = content.querySelector('table');
+                        if (!input || !table) return;
+                        const rows = Array.from(table.querySelectorAll('tbody tr'));
+                        input.addEventListener('input', () => {
+                            const q = input.value.toLowerCase().trim();
+                            rows.forEach(r => {
+                                const text = (r.textContent || '').toLowerCase();
+                                r.style.display = !q || text.includes(q) ? '' : 'none';
+                            });
+                        });
+                    });
+                }
+
+                // Color-code disk usage percentage badges
+                function applyDiskUsageColors() {
+                    const cells = document.querySelectorAll('#disks-content td[data-usage]');
+                    cells.forEach(cell => {
+                        const span = cell.querySelector('span');
+                        if (!span) return;
+                        const raw = cell.getAttribute('data-usage') || span.textContent;
+                        const m = raw.match(/(\d+)%/);
+                        let classes = ['bg-amber-100','text-amber-700'];
+                        if (m) {
+                            const p = parseInt(m[1], 10);
+                            if (p < 30) classes = ['bg-emerald-100','text-emerald-700'];
+                            else if (p >= 70) classes = ['bg-red-100','text-red-700'];
+                            else classes = ['bg-amber-100','text-amber-700'];
+                        }
+                        span.classList.remove('bg-emerald-100','text-emerald-700','bg-amber-100','text-amber-700','bg-red-100','text-red-700');
+                        classes.forEach(c => span.classList.add(c));
+                    });
+                }
+
+                // Export a table inside a hardware tab content to CSV
+                function exportHardwareCSV(tabContentId, filename) {
+                    const container = document.getElementById(tabContentId);
+                    if (!container) return;
+                    const table = container.querySelector('table');
+                    if (!table) return;
+
+                    const rows = Array.from(table.querySelectorAll('tr'));
+                    const csv = rows.map(row => {
+                        const cells = Array.from(row.querySelectorAll('th, td'));
+                        return cells.map(cell => {
+                            let text = (cell.textContent || '').trim();
+                            // Escape quotes and wrap in quotes
+                            text = '"' + text.replace(/"/g, '""') + '"';
+                            return text;
+                        }).join(',');
+                    }).join('\n');
+
+                    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', filename || 'hardware.csv');
+                    link.style.display = 'none';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                }
+                window.exportHardwareCSV = exportHardwareCSV;
+                </script>
             </div>
 
             <!-- Right Column - Sidebar -->

@@ -374,17 +374,6 @@ class SystemCollector:
                         "usage": parts[4]
                     }
                     break
-
-        # Pre-fetch all disk serials via lsblk -d -o NAME,SERIAL
-        disk_serials = {}
-        serial_output = self.run_command(["lsblk", "-d", "-o", "NAME,SERIAL"])
-        for line in serial_output.split("\n")[1:]:  # Skip header
-            parts = line.split(None, 1)
-            if len(parts) >= 1:
-                disk_name = parts[0]
-                serial = parts[1].strip() if len(parts) >= 2 else None
-                if serial and serial != "":
-                    disk_serials[disk_name] = serial
         
         # Get physical disk to partition mapping using lsblk
         lsblk_output = self.run_command(["lsblk", "-o", "NAME,SIZE,MODEL,SERIAL"])
@@ -488,10 +477,6 @@ class SystemCollector:
             
             if fdisk_info["model"]:
                 disk["model"] = fdisk_info["model"]
-
-            # Use pre-fetched serial from lsblk
-            if disk_name in disk_serials:
-                disk["serial"] = disk_serials[disk_name]
             
             # Add usage info only to the disk that contains root filesystem
             if root_physical_disk and disk_name == root_physical_disk and usage_info:
@@ -565,26 +550,24 @@ class SystemCollector:
         return network_info
 
     def get_accelerator_info(self) -> dict[str, Any]:
-        """Get accelerator information using lspci | grep -i acc.
-
-        No fallback: if grep finds nothing, return empty list.
-        """
+        """Get accelerator information using lspci."""
         accelerator_info = {"accelerator": []}
-
-        grep_output = self.run_command(["bash", "-lc", "lspci | grep -i acc"]) or ""
-        for line in grep_output.split("\n"):
-            line = line.strip()
-            if not line:
-                continue
-            parts = line.split(None, 1)
-            if len(parts) >= 2:
-                pci_address = parts[0]
-                description = parts[1]
-                accelerator_info["accelerator"].append({
-                    "pci_address": pci_address,
-                    "description": description
-                })
-
+        output = self.run_command(["lspci"])
+        
+        for line in output.split("\n"):
+            # Case-insensitive search for accelerator-related keywords
+            line_lower = line.lower()
+            if any(keyword in line_lower for keyword in ["vga", "3d", "display", "gpu", "graphics", "accelerator", "processing unit"]):
+                # Parse the PCI address and device description
+                parts = line.split(None, 1)
+                if len(parts) >= 2:
+                    pci_address = parts[0]
+                    description = parts[1]
+                    accelerator_info["accelerator"].append({
+                        "pci_address": pci_address,
+                        "description": description
+                    })
+        
         return accelerator_info
 
     def get_network_info(self) -> dict[str, Any]:

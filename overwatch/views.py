@@ -1,17 +1,22 @@
 import json
 from dataclasses import dataclass
 from io import StringIO
-from typing import Any
+from typing import Any, Callable
 
 from django import forms
+from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from datetime import timedelta
 from django.core.management import call_command
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from django.contrib import messages
+from django.db import models
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.contrib.admin.models import LogEntry
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 from django.utils import timezone
 from django.conf import settings
@@ -21,7 +26,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, IPAM, IPAM_STATUS_CHOICES, Note, Server, Subnet, Tag
+from .models import Category, DataDictionary, DICTIONARY_CATEGORY_CHOICES, IPAM, IPAM_STATUS_CHOICES, Note, Server, Subnet, Tag, AuditEvent
 from .serializers import CategorySerializer, ServerSerializer, SubnetSerializer, TagSerializer
 
 
@@ -35,6 +40,8 @@ FORM_CHECKBOX_CLASS = "rounded border-slate-300 text-blue-600"
 
 PAGE_SIZES = [25, 50, 100, 200]
 DEFAULT_PAGE_SIZE = 25
+
+
 
 
 # =============================================================================
@@ -102,12 +109,15 @@ def generic_create_view(
     request: HttpRequest,
     config: CRUDConfig,
     extra_context: dict[str, Any] | None = None,
+    post_save_callback: Callable | None = None,
 ) -> HttpResponse:
-    """Generic create view for simple CRUD entities."""
+    """Generic create view for simple CRUD entities with optional post-save hook."""
     if request.method == "POST":
         form = config.form_class(request.POST)
         if form.is_valid():
-            form.save()
+            instance = form.save()
+            if post_save_callback:
+                post_save_callback(instance, request)
             # For HTMX requests, return a response that triggers page refresh
             if request.headers.get("HX-Request"):
                 response = HttpResponse()
@@ -138,13 +148,16 @@ def generic_edit_view(
     pk: int,
     config: CRUDConfig,
     extra_context: dict[str, Any] | None = None,
+    post_save_callback: Callable | None = None,
 ) -> HttpResponse:
-    """Generic edit view for simple CRUD entities."""
+    """Generic edit view for simple CRUD entities with optional post-save hook."""
     instance = get_object_or_404(config.model, pk=pk)
     if request.method == "POST":
         form = config.form_class(request.POST, instance=instance)
         if form.is_valid():
-            form.save()
+            updated = form.save()
+            if post_save_callback:
+                post_save_callback(updated, request)
             # For HTMX requests, return a response that triggers page refresh
             if request.headers.get("HX-Request"):
                 response = HttpResponse()
@@ -171,14 +184,23 @@ def generic_edit_view(
     return render(request, template, context)
 
 
-def generic_delete_view(request: HttpRequest, pk: int, config: CRUDConfig) -> HttpResponse:
-    """Generic delete view for simple CRUD entities."""
+def generic_delete_view(
+    request: HttpRequest,
+    pk: int,
+    config: CRUDConfig,
+    post_delete_callback: Callable | None = None,
+) -> HttpResponse:
+    """Generic delete view for simple CRUD entities with optional post-delete hook."""
     instance = get_object_or_404(config.model, pk=pk)
     if request.method == "POST":
+        if post_delete_callback:
+            post_delete_callback(instance, request)
         instance.delete()
     return redirect(config.list_url_name)
 
 
+@login_required
+@login_required
 def server_list(request: HttpRequest) -> HttpResponse:
     platform_map = {
         d.original_keyword.lower(): d.standardized_value
@@ -287,6 +309,7 @@ def server_list(request: HttpRequest) -> HttpResponse:
     return render(request, template, context)
 
 
+@login_required
 def server_detail(request: HttpRequest, pk: int) -> HttpResponse:
     server = get_object_or_404(Server.objects.prefetch_related("tags"), pk=pk)
     platform_map = {
@@ -317,6 +340,7 @@ def server_detail(request: HttpRequest, pk: int) -> HttpResponse:
 
 
 # Dictionary views
+@login_required
 def dictionary_list(request: HttpRequest) -> HttpResponse:
     items = DataDictionary.objects.all().order_by("original_keyword")
     total_all_count = items.count()
@@ -419,19 +443,37 @@ DICTIONARY_CONFIG = CRUDConfig(
 )
 
 
+@login_required
 def dictionary_create(request: HttpRequest) -> HttpResponse:
-    return generic_create_view(request, DICTIONARY_CONFIG)
+    return generic_create_view(
+        request,
+        DICTIONARY_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "create", obj, "Created data mapping"),
+    )
 
 
+@login_required
 def dictionary_edit(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_edit_view(request, pk, DICTIONARY_CONFIG)
+    return generic_edit_view(
+        request,
+        pk,
+        DICTIONARY_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "update", obj, "Updated data mapping"),
+    )
 
 
+@login_required
 def dictionary_delete(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_delete_view(request, pk, DICTIONARY_CONFIG)
+    return generic_delete_view(
+        request,
+        pk,
+        DICTIONARY_CONFIG,
+        post_delete_callback=lambda obj, req: log_event(req.user, "delete", obj, "Deleted data mapping"),
+    )
 
 
 @require_POST
+@login_required
 def dictionary_apply_translations(request: HttpRequest) -> HttpResponse:
     if not request.user.is_staff:
         return HttpResponse("Error: Forbidden - Staff access required", status=403, content_type="text/plain")
@@ -671,6 +713,7 @@ SUBNET_CONFIG = CRUDConfig(
 )
 
 
+@login_required
 def tag_list(request: HttpRequest) -> HttpResponse:
     tags = Tag.objects.all().order_by("name")
     total_all_count = tags.count()
@@ -693,18 +736,37 @@ def tag_list(request: HttpRequest) -> HttpResponse:
     return render(request, template, context)
 
 
+@login_required
 def tag_create(request: HttpRequest) -> HttpResponse:
-    return generic_create_view(request, TAG_CONFIG)
+    return generic_create_view(
+        request,
+        TAG_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "create", obj, "Created tag"),
+    )
 
 
+@login_required
 def tag_edit(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_edit_view(request, pk, TAG_CONFIG)
+    return generic_edit_view(
+        request,
+        pk,
+        TAG_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "update", obj, "Updated tag"),
+    )
 
 
+@login_required
 def tag_delete(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_delete_view(request, pk, TAG_CONFIG)
+    return generic_delete_view(
+        request,
+        pk,
+        TAG_CONFIG,
+        post_delete_callback=lambda obj, req: log_event(req.user, "delete", obj, "Deleted tag"),
+    )
 
 
+@login_required
+@login_required
 def category_list(request: HttpRequest) -> HttpResponse:
     categories = Category.objects.all().order_by("device_type")
     total_all_count = categories.count()
@@ -728,18 +790,37 @@ def category_list(request: HttpRequest) -> HttpResponse:
     return render(request, template, context)
 
 
+@login_required
 def category_create(request: HttpRequest) -> HttpResponse:
-    return generic_create_view(request, CATEGORY_CONFIG)
+    return generic_create_view(
+        request,
+        CATEGORY_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "create", obj, "Created category"),
+    )
 
 
+@login_required
 def category_edit(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_edit_view(request, pk, CATEGORY_CONFIG)
+    return generic_edit_view(
+        request,
+        pk,
+        CATEGORY_CONFIG,
+        post_save_callback=lambda obj, req: log_event(req.user, "update", obj, "Updated category"),
+    )
 
 
+@login_required
 def category_delete(request: HttpRequest, pk: int) -> HttpResponse:
-    return generic_delete_view(request, pk, CATEGORY_CONFIG)
+    return generic_delete_view(
+        request,
+        pk,
+        CATEGORY_CONFIG,
+        post_delete_callback=lambda obj, req: log_event(req.user, "delete", obj, "Deleted category"),
+    )
 
 
+@login_required
+@login_required
 def subnet_list(request: HttpRequest) -> HttpResponse:
     subnets = Subnet.objects.all().order_by("name")
     total_all_count = subnets.count()
@@ -783,18 +864,22 @@ def subnet_list(request: HttpRequest) -> HttpResponse:
     return render(request, template, context)
 
 
+@login_required
 def subnet_create(request: HttpRequest) -> HttpResponse:
     return generic_create_view(request, SUBNET_CONFIG)
 
 
+@login_required
 def subnet_edit(request: HttpRequest, pk: int) -> HttpResponse:
     return generic_edit_view(request, pk, SUBNET_CONFIG)
 
 
+@login_required
 def subnet_delete(request: HttpRequest, pk: int) -> HttpResponse:
     return generic_delete_view(request, pk, SUBNET_CONFIG)
 
 
+@login_required
 def subnet_detail(request: HttpRequest, pk: int) -> HttpResponse:
     """View subnet details in a modal."""
     subnet = get_object_or_404(Subnet, pk=pk)
@@ -842,6 +927,8 @@ IPAM_CONFIG = CRUDConfig(
 )
 
 
+@login_required
+@login_required
 def ipam_list(request: HttpRequest) -> HttpResponse:
     """Database-driven IPAM view - shows static and DHCP IP allocations."""
     import ipaddress as ip_lib
@@ -855,8 +942,8 @@ def ipam_list(request: HttpRequest) -> HttpResponse:
     # Get all subnets for filter dropdown
     subnets = Subnet.objects.all().order_by("name")
     
-    # Build IPAM query
-    ipam_records = IPAM.objects.select_related("subnet", "server")
+    # Build IPAM query - exclude 0.0.0.0 placeholder
+    ipam_records = IPAM.objects.select_related("subnet", "server").exclude(ip_address="0.0.0.0")
     
     # Filter by subnet
     selected_subnet = None
@@ -948,6 +1035,7 @@ def ipam_list(request: HttpRequest) -> HttpResponse:
     return render(request, "overwatch/ipam_list.html", context)
 
 
+@login_required
 def ipam_available_ips(request: HttpRequest, subnet_id: int) -> JsonResponse:
     """Get available IPs for a subnet (for reservation modal)."""
     import ipaddress as ip_lib
@@ -982,13 +1070,15 @@ def ipam_available_ips(request: HttpRequest, subnet_id: int) -> JsonResponse:
         return JsonResponse({'ips': [], 'error': str(e)})
 
 
+@login_required
 def ipam_reserve(request: HttpRequest) -> JsonResponse:
     """Reserve one or more IP addresses."""
     if request.method != 'POST':
         return JsonResponse({'success': False, 'message': 'Invalid method'})
     
     try:
-        ip_ids = request.POST.getlist('ip_ids')
+        ip_ids = [s.strip() for s in request.POST.getlist('ip_ids') if s.strip()]
+        subnet_id = request.POST.get('subnet_id')
         note = request.POST.get('note', '').strip()
         
         print(f"DEBUG: ip_ids={ip_ids}, note={note}")  # Debug logging
@@ -1004,16 +1094,23 @@ def ipam_reserve(request: HttpRequest) -> JsonResponse:
         errors = []
         for ip_id in ip_ids:
             try:
-                ipam = IPAM.objects.get(id=ip_id, status='available')
+                qs = IPAM.objects.filter(id=ip_id)
+                if subnet_id:
+                    qs = qs.filter(subnet_id=subnet_id)
+                ipam = qs.first()
+                if not ipam:
+                    errors.append(f"IP ID {ip_id} not found")
+                    continue
+                if ipam.status != 'available':
+                    errors.append(f"IP {ipam.ip_address} is not available (status: {ipam.status})")
+                    continue
                 ipam.status = 'reserved'
                 ipam.description = note
                 ipam.updated_by = request.user
                 ipam.save()
+                log_event(request.user, 'ipam', ipam, f'Reserved IP {ipam.ip_address}: {note}')
                 updated_count += 1
                 print(f"DEBUG: Reserved IP {ipam.ip_address}")  # Debug logging
-            except IPAM.DoesNotExist:
-                errors.append(f"IP ID {ip_id} not found or not available")
-                continue
             except Exception as e:
                 errors.append(f"Error with IP ID {ip_id}: {str(e)}")
                 continue
@@ -1026,7 +1123,7 @@ def ipam_reserve(request: HttpRequest) -> JsonResponse:
         else:
             return JsonResponse({
                 'success': False,
-                'message': f'No IPs were available for reservation. Errors: {", ".join(errors)}'
+                'message': f'No IPs were reserved. Errors: {", ".join(errors)}'
             })
     
     except Exception as e:
@@ -1036,10 +1133,27 @@ def ipam_reserve(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'})
 
 
+@login_required
 def ipam_create(request: HttpRequest) -> HttpResponse:
-    return generic_create_view(request, IPAM_CONFIG)
+    from overwatch.signals import find_subnet_for_ip
+    resp = generic_create_view(request, IPAM_CONFIG)
+    if request.method == 'POST':
+        try:
+            last = IPAM.objects.order_by('-id').first()
+            if last:
+                # Validate subnet and set ip_type
+                subnet = find_subnet_for_ip(last.ip_address)
+                if not subnet:
+                    last.ip_type = 'subnet_not_exist'
+                    last.subnet = None
+                    last.save()
+                log_event(request.user, 'ipam', last, f'Created IP {last.ip_address}')
+        except Exception:
+            pass
+    return resp
 
 
+@login_required
 def ipam_unreserve(request: HttpRequest, pk: int) -> JsonResponse:
     """Unreserve an IP address - only creator or superuser can do this."""
     if request.method != 'POST':
@@ -1064,6 +1178,7 @@ def ipam_unreserve(request: HttpRequest, pk: int) -> JsonResponse:
         ipam.description = None
         ipam.updated_by = request.user
         ipam.save()
+        log_event(request.user, 'ipam', ipam, f'Unreserved IP {ipam.ip_address}')
         
         print(f"DEBUG: IP {ipam.ip_address} unreserved by {request.user.username}")
         
@@ -1081,6 +1196,7 @@ def ipam_unreserve(request: HttpRequest, pk: int) -> JsonResponse:
         return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
 
 
+@login_required
 def ipam_my_reserved_ips(request: HttpRequest) -> JsonResponse:
     """Fetch IPs reserved by the logged-in user."""
     if request.method != 'GET':
@@ -1115,6 +1231,7 @@ def ipam_my_reserved_ips(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
 
 
+@login_required
 def ipam_release_ips(request: HttpRequest) -> JsonResponse:
     """Release (unreserve) one or more IPs reserved by the logged-in user."""
     if request.method != 'POST':
@@ -1137,6 +1254,7 @@ def ipam_release_ips(request: HttpRequest) -> JsonResponse:
                 ipam.description = None
                 ipam.updated_by = request.user
                 ipam.save()
+                log_event(request.user, 'ipam', ipam, f'Released IP {ipam.ip_address}')
                 released_count += 1
             except IPAM.DoesNotExist:
                 errors.append(f"IP ID {ip_id} not found or not reserved by you")
@@ -1161,6 +1279,7 @@ def ipam_release_ips(request: HttpRequest) -> JsonResponse:
         return JsonResponse({'success': False, 'message': f'Server error: {str(e)}'}, status=500)
 
 
+@login_required
 def ipam_edit(request: HttpRequest, pk: int) -> HttpResponse:
     """Custom IPAM edit with permission checking for reserved IPs."""
     try:
@@ -1190,6 +1309,7 @@ def ipam_edit(request: HttpRequest, pk: int) -> HttpResponse:
                 
                 ipam.updated_by = request.user
                 ipam.save()
+                log_event(request.user, 'ipam', ipam, f'Edited IP {ipam.ip_address} status {old_status} → {new_status}')
                 
                 print(f"DEBUG: IP {ipam.ip_address} updated - status: {old_status} → {new_status}")
                 
@@ -1227,11 +1347,20 @@ def ipam_edit(request: HttpRequest, pk: int) -> HttpResponse:
         return HttpResponse(f'<div class="p-4 text-red-600">❌ Error: {str(e)}</div>', status=500)
 
 
+@login_required
 def ipam_delete(request: HttpRequest, pk: int) -> HttpResponse:
     """Custom IPAM delete with permission checking for reserved IPs."""
     try:
         ipam = IPAM.objects.get(pk=pk)
         
+        # Prevent deletion of IPs automatically created by a Subnet (non-static types)
+        # Only allow deletion for standalone static IPs not auto-generated.
+        if ipam.subnet and ipam.ip_type != 'static':
+            return JsonResponse({
+                'success': False,
+                'message': 'This IP comes from a Subnet auto-allocation and cannot be deleted. Only standalone static IPs can be removed.'
+            }, status=403)
+
         # Check permissions for reserved IPs
         if ipam.status == 'reserved':
             # Only creator or superuser can delete reserved IPs
@@ -1240,8 +1369,14 @@ def ipam_delete(request: HttpRequest, pk: int) -> HttpResponse:
                     'success': False,
                     'message': 'You do not have permission to delete this reserved IP.'
                 }, status=403)
-        
-        return generic_delete_view(request, pk, IPAM_CONFIG)
+
+        # Perform deletion via POST only
+        if request.method == 'POST':
+            log_event(request.user, 'ipam', ipam, f'Deleted IP {ipam.ip_address}')
+            ipam.delete()
+            return JsonResponse({'success': True, 'message': 'IP deleted successfully'})
+        else:
+            return JsonResponse({'success': False, 'message': 'Invalid method'}, status=405)
     
     except IPAM.DoesNotExist:
         return JsonResponse({'success': False, 'message': 'IP not found'}, status=404)
@@ -1482,11 +1617,13 @@ class NoteForm(forms.ModelForm):
         }
 
 
+@login_required
 def server_create(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = ServerForm(request.POST)
         if form.is_valid():
             server = form.save()
+            log_event(request.user, "create", server, "Created server")
             return redirect("overwatch:server_detail", pk=server.pk)
     else:
         form = ServerForm()
@@ -1498,12 +1635,18 @@ def server_create(request: HttpRequest) -> HttpResponse:
     )
 
 
+@login_required
 def server_edit(request: HttpRequest, pk: int) -> HttpResponse:
     server = get_object_or_404(Server, pk=pk)
     if request.method == "POST":
         form = ServerForm(request.POST, instance=server)
         if form.is_valid():
-            form.save()
+            original_name = server.hostname
+            updated = form.save()
+            if original_name != updated.hostname:
+                log_event(request.user, "update", updated, f"Changed hostname from '{original_name}' to '{updated.hostname}'")
+            else:
+                log_event(request.user, "update", updated, "Updated server details")
             return redirect("overwatch:server_detail", pk=pk)
     else:
         form = ServerForm(instance=server)
@@ -1515,13 +1658,17 @@ def server_edit(request: HttpRequest, pk: int) -> HttpResponse:
     )
 
 
+@login_required
 def server_delete(request: HttpRequest, pk: int) -> HttpResponse:
     server = get_object_or_404(Server, pk=pk)
     if request.method == "POST":
+        log_event(request.user, "delete", server, "Deleted server")
         server.delete()
     return redirect("overwatch:server_list")
 
 
+@login_required
+@login_required
 def server_note_create(request: HttpRequest, pk: int) -> HttpResponse:
     server = get_object_or_404(Server, pk=pk)
     if request.method == "POST":
@@ -1532,9 +1679,11 @@ def server_note_create(request: HttpRequest, pk: int) -> HttpResponse:
             if request.user.is_authenticated:
                 note.updated_by = request.user
             note.save()
+            log_event(request.user, "note", server, f"Added note (priority: {note.priority})")
     return redirect("overwatch:server_detail", pk=pk)
 
 
+@login_required
 def server_note_edit(request: HttpRequest, pk: int, note_pk: int) -> HttpResponse:
     from .models import Note
     note = get_object_or_404(Note, pk=note_pk, server_id=pk)
@@ -1548,12 +1697,14 @@ def server_note_edit(request: HttpRequest, pk: int, note_pk: int) -> HttpRespons
     return redirect("overwatch:server_detail", pk=pk)
 
 
+@login_required
 def server_note_delete(request: HttpRequest, pk: int, note_pk: int) -> HttpResponse:
     from .models import Note
     note = get_object_or_404(Note, pk=note_pk, server_id=pk)
     # Only the note owner can delete
     if request.method == "POST":
         if request.user.is_authenticated and request.user == note.updated_by:
+            log_event(request.user, "note", note.server, "Deleted note")
             note.delete()
     return redirect("overwatch:server_detail", pk=pk)
 
@@ -1619,26 +1770,70 @@ def agent_data_push(request: HttpRequest) -> JsonResponse:
             server = Server(uuid=gen_uuid, hostname=hostname, data_source="api")
             created = True
 
-    # Update server fields when provided
-    updates = {
-        "hostname": hostname,
-        "ip_address": payload.get("ip_address") or server.ip_address,
-        "bmc_ip": payload.get("bmc_ip") or server.bmc_ip,
-        "nic_mac": payload.get("nic_mac") or server.nic_mac,
-        "os": payload.get("os") or server.os,
-        "os_version": payload.get("os_version") or server.os_version,
-        "kernel": payload.get("kernel") or server.kernel,
-        "cpu": payload.get("cpu") or server.cpu,
-        "core_count": payload.get("core_count") or server.core_count,
-        "total_mem": payload.get("total_mem") or server.total_mem,
-        "disk_count": payload.get("disk_count") or server.disk_count,
-        "device_type": payload.get("device_type") or server.device_type,
-    }
-    for field, value in updates.items():
-        setattr(server, field, value)
+    # Update server fields when provided (core + extended)
+    # Use explicit checks to allow updates even when current value exists
+    if hostname:
+        server.hostname = hostname
+    if payload.get("ip_address"):
+        server.ip_address = payload.get("ip_address")
+    if payload.get("bmc_ip"):
+        server.bmc_ip = payload.get("bmc_ip")
+    if payload.get("bmc_mac"):
+        server.bmc_mac = payload.get("bmc_mac")
+    if payload.get("nic_mac"):
+        server.nic_mac = payload.get("nic_mac")
+    if payload.get("os"):
+        server.os = payload.get("os")
+    if payload.get("os_version"):
+        server.os_version = payload.get("os_version")
+    if payload.get("kernel"):
+        server.kernel = payload.get("kernel")
+    if payload.get("cpu"):
+        server.cpu = payload.get("cpu")
+    if payload.get("core_count") is not None:
+        server.core_count = payload.get("core_count")
+    if payload.get("sockets") is not None:
+        server.sockets = payload.get("sockets")
+    if payload.get("total_mem") is not None:
+        server.total_mem = payload.get("total_mem")
+    if payload.get("disk_count") is not None:
+        server.disk_count = payload.get("disk_count")
+    if payload.get("bios_version"):
+        server.bios_version = payload.get("bios_version")
+    if payload.get("bios_release_date"):
+        server.bios_release_date = payload.get("bios_release_date")
+    if payload.get("manufacture"):
+        server.manufacture = payload.get("manufacture")
+    if payload.get("product_name"):
+        server.product_name = payload.get("product_name")
+    if payload.get("device_type"):
+        server.device_type = payload.get("device_type")
+        # Also create/link Category for UI display
+        device_type_str = payload.get("device_type")
+        if device_type_str:
+            category, _ = Category.objects.get_or_create(
+                device_type__iexact=device_type_str,
+                defaults={"device_type": device_type_str.title(), "added_by": "agent"}
+            )
+            server.category = category
+
+    # Persist detailed hardware JSON sections when present
+    for json_field in [
+        "mem_details",
+        "disk_details",
+        "network_interfaces",
+        "expansion_slots",
+        "accelerator",
+    ]:
+        if json_field in payload and payload.get(json_field) is not None:
+            setattr(server, json_field, payload.get(json_field))
 
     server.data_source = "api"
     server.save()
+
+    # Log the agent push
+    action = "create" if created else "update"
+    log_event(None, action, server, f"Agent push: {action}d server {hostname}")
 
     return JsonResponse({"status": "ok", "server_id": server.id})
 
@@ -1709,3 +1904,360 @@ class SubnetViewSet(viewsets.ModelViewSet):
     search_fields = ["name", "network", "description"]
     ordering = ["name"]
 
+
+# =============================================================================
+# ACTIVITY LOG - Admin actions and app events
+# =============================================================================
+@login_required
+def activity_log(request: HttpRequest) -> HttpResponse:
+    """Display AuditEvent records with filters and pagination (90-day retention)."""
+    # Filters
+    query = request.GET.get("q", "").strip()
+    user_id = request.GET.get("user", "").strip()
+    event = request.GET.get("event", "").strip()  # create|update|delete|note|ipam|other
+    date_from = request.GET.get("date_from", "").strip()
+    date_to = request.GET.get("date_to", "").strip()
+    date_preset = request.GET.get("date_preset", "").strip()
+
+    entries = AuditEvent.objects.select_related("user").all()
+
+    if user_id:
+        try:
+            entries = entries.filter(user_id=int(user_id))
+        except ValueError:
+            pass
+
+    if event:
+        entries = entries.filter(action=event)
+
+    # Date filtering
+    from django.utils.dateparse import parse_date
+    df = parse_date(date_from) if date_from else None
+    dt = parse_date(date_to) if date_to else None
+
+    # Apply preset ranges when provided (custom keeps manual dates)
+    if date_preset and date_preset != "custom" and date_preset != "allTime":
+        today = timezone.localdate()
+        if date_preset == "today":
+            df = dt = today
+        elif date_preset == "yesterday":
+            df = dt = today - timedelta(days=1)
+        elif date_preset == "last7":
+            df = today - timedelta(days=6)
+            dt = today
+        elif date_preset == "last30":
+            df = today - timedelta(days=29)
+            dt = today
+        elif date_preset == "thisMonth":
+            df = today.replace(day=1)
+            # end of month
+            next_month = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+            dt = next_month - timedelta(days=1)
+        elif date_preset == "lastMonth":
+            first_this = today.replace(day=1)
+            last_month_end = first_this - timedelta(days=1)
+            df = last_month_end.replace(day=1)
+            dt = last_month_end
+        else:
+            df = dt = None
+        # Update string representations for the template when preset is used
+        date_from = df.isoformat() if df else ""
+        date_to = dt.isoformat() if dt else ""
+
+    if df:
+        entries = entries.filter(created_at__date__gte=df)
+    if dt:
+        entries = entries.filter(created_at__date__lte=dt)
+
+    # Search across object repr and message
+    if query:
+        entries = entries.filter(
+            Q(entity_repr__icontains=query) | Q(message__icontains=query)
+        )
+
+    entries = entries.order_by("-created_at")
+
+    # Pagination
+    page_ctx = paginate_queryset(entries, request)
+
+    # Distinct users for filter
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+    users = User.objects.all().order_by("username")
+
+    context = {
+        **page_ctx,
+        "query": query,
+        "users": users,
+        "selected_user": int(user_id) if user_id.isdigit() else None,
+        "event": event,
+        "date_from": date_from,
+        "date_to": date_to,
+        "date_preset": date_preset or "",
+        "event_choices": [
+            ("", "All events"),
+            ("create", "Create"),
+            ("update", "Update"),
+            ("delete", "Delete"),
+            ("note", "Note"),
+            ("ipam", "IPAM"),
+            ("other", "Other"),
+        ],
+    }
+
+    template = get_htmx_template(
+        request,
+        partial_template="overwatch/partials/activity_log_table.html",
+        full_template="overwatch/activity_log.html",
+    )
+
+    return render(request, template, context)
+
+# =============================================================================
+# AUDIT LOGGING HELPER
+# =============================================================================
+def log_event(user, action: str, entity, message: str | None = None) -> None:
+    """Create an AuditEvent entry.
+
+    Args:
+        user: Django user performing the action (can be None)
+        action: One of 'create'|'update'|'delete'|'note'|'ipam'|'other'
+        entity: Model instance related to the event
+        message: Optional descriptive message
+    """
+    try:
+        entity_type = entity.__class__.__name__ if entity is not None else "Unknown"
+        entity_id = getattr(entity, "id", None)
+        entity_repr = str(entity) if entity is not None else None
+        AuditEvent.objects.create(
+            user=user if hasattr(user, "id") else None,
+            action=action,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            entity_repr=entity_repr,
+            message=message or "",
+        )
+    except Exception as e:
+        # Fail silently to avoid breaking primary flows
+        print(f"AuditEvent log error: {e}")
+
+
+@login_required
+@require_POST
+def purge_old_audit_logs(request: HttpRequest) -> JsonResponse:
+    """Purge audit logs older than 120 days."""
+    try:
+        cutoff_date = timezone.now() - timedelta(days=120)
+        deleted_count, _ = AuditEvent.objects.filter(created_at__lt=cutoff_date).delete()
+        
+        log_event(
+            request.user,
+            "other",
+            None,
+            f"Purged {deleted_count} audit log(s) older than 120 days"
+        )
+        
+        return JsonResponse({
+            "success": True,
+            "deleted_count": deleted_count,
+            "message": f"Successfully deleted {deleted_count} audit log(s) older than 120 days"
+        })
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "message": f"Error purging logs: {str(e)}"
+        }, status=500)
+
+
+# =============================================================================
+# ADMIN DASHBOARD - System and User Tracking
+# =============================================================================
+@login_required
+@login_required
+def admin_dashboard(request: HttpRequest) -> HttpResponse:
+    """Comprehensive admin dashboard for system and user tracking."""
+    
+    # System Statistics
+    total_servers = Server.objects.count()
+    active_servers = Server.objects.filter(status="active").count()
+    maintenance_servers = Server.objects.filter(status="maintenance").count()
+    inactive_servers = Server.objects.filter(status="inactive").count()
+    decommissioned_servers = Server.objects.filter(status="decommissioned").count()
+    
+    # Server by type
+    server_by_type = {}
+    for server in Server.objects.values('device_type').distinct():
+        device_type = server['device_type'] or "Unknown"
+        count = Server.objects.filter(device_type=device_type).count()
+        server_by_type[device_type] = count
+    
+    # Server by manufacturer
+    server_by_mfg = {}
+    for server in Server.objects.values('manufacture').distinct():
+        manufacture = server['manufacture'] or "Unknown"
+        count = Server.objects.filter(manufacture=manufacture).count()
+        server_by_mfg[manufacture] = count
+    
+    # Server by OS
+    server_by_os = {}
+    for server in Server.objects.values('os').distinct():
+        os_name = server['os'] or "Unknown"
+        count = Server.objects.filter(os=os_name).count()
+        server_by_os[os_name] = count
+    
+    # Hardware Statistics
+    avg_cpu_cores = 0
+    avg_memory = 0
+    total_disk_space = 0
+    servers_with_data = Server.objects.exclude(core_count__isnull=True).exclude(total_mem__isnull=True)
+    if servers_with_data.exists():
+        avg_cpu_cores = int(servers_with_data.values('core_count').aggregate(avg=models.Avg('core_count'))['avg'] or 0)
+        avg_memory = int(servers_with_data.values('total_mem').aggregate(avg=models.Avg('total_mem'))['avg'] or 0)
+    
+    # Calculate total disk space in TB
+    disk_servers = Server.objects.exclude(disk_details__isnull=True)
+    total_disk_gb = 0
+    for server in disk_servers:
+        if server.disk_details and isinstance(server.disk_details, list):
+            for disk in server.disk_details:
+                if isinstance(disk, dict) and 'size' in disk:
+                    size_str = disk['size'].split()[0]
+                    try:
+                        total_disk_gb += float(size_str)
+                    except ValueError:
+                        pass
+    total_disk_space = round(total_disk_gb / 1024, 2)  # Convert to TB
+    
+    # Network & IPAM Statistics
+    total_subnets = Subnet.objects.count()
+    total_ips = IPAM.objects.count()
+    available_ips = IPAM.objects.filter(status="available").count()
+    assigned_ips = IPAM.objects.filter(status="assigned").count()
+    reserved_ips = IPAM.objects.filter(status="reserved").count()
+    conflict_ips = IPAM.objects.filter(status="conflict").count()
+    
+    # IP Allocation percentage
+    ip_allocation_percentage = 0
+    if total_ips > 0:
+        ip_allocation_percentage = round((assigned_ips / total_ips) * 100, 1)
+    
+    # Server Updates - Recent changes
+    recent_servers = Server.objects.order_by('-updated_at')[:5]
+    
+    # Top servers by recent activity
+    active_nic_count = Server.objects.filter(network_interfaces__isnull=False).exclude(network_interfaces=[]).count()
+    
+    # User Activity
+    recent_notes = Note.objects.select_related('server', 'updated_by').order_by('-updated_at')[:5]
+    
+    # Notes statistics
+    total_notes = Note.objects.count()
+    high_priority_notes = Note.objects.filter(priority="high").count()
+    medium_priority_notes = Note.objects.filter(priority="medium").count()
+    
+    # Category breakdown
+    categories = Category.objects.annotate(
+        server_count=models.Count('servers')
+    ).order_by('-server_count')
+    
+    # Top tags
+    tags_with_counts = Tag.objects.annotate(
+        server_count=models.Count('servers')
+    ).order_by('-server_count')[:10]
+    
+    # Most used CPUs
+    cpu_list = Server.objects.values('cpu').exclude(cpu__isnull=True).exclude(cpu__exact='').annotate(
+        count=models.Count('cpu')
+    ).order_by('-count')[:5]
+    
+    # Most used Operating Systems
+    os_list = Server.objects.values('os').exclude(os__isnull=True).exclude(os__exact='').annotate(
+        count=models.Count('os')
+    ).order_by('-count')[:5]
+    
+    # Hardware with accelerators
+    servers_with_accelerators = Server.objects.exclude(accelerator__isnull=True).exclude(accelerator=[]).count()
+    
+    # Data source breakdown
+    data_source_breakdown = {}
+    for server in Server.objects.values('data_source').distinct():
+        source = server['data_source'] or "Unknown"
+        count = Server.objects.filter(data_source=source).count()
+        data_source_breakdown[source] = count
+    
+    # Last 30 days server updates
+    from django.utils import timezone
+    from datetime import timedelta
+    last_30_days = timezone.now() - timedelta(days=30)
+    servers_updated_30d = Server.objects.filter(updated_at__gte=last_30_days).count()
+    
+    context = {
+        'total_servers': total_servers,
+        'active_servers': active_servers,
+        'maintenance_servers': maintenance_servers,
+        'inactive_servers': inactive_servers,
+        'decommissioned_servers': decommissioned_servers,
+        'avg_cpu_cores': avg_cpu_cores,
+        'avg_memory': avg_memory,
+        'total_disk_space': total_disk_space,
+        'active_nic_count': active_nic_count,
+        'total_subnets': total_subnets,
+        'total_ips': total_ips,
+        'available_ips': available_ips,
+        'assigned_ips': assigned_ips,
+        'reserved_ips': reserved_ips,
+        'conflict_ips': conflict_ips,
+        'ip_allocation_percentage': ip_allocation_percentage,
+        'recent_servers': recent_servers,
+        'recent_notes': recent_notes,
+        'total_notes': total_notes,
+        'high_priority_notes': high_priority_notes,
+        'medium_priority_notes': medium_priority_notes,
+        'categories': categories,
+        'tags_with_counts': tags_with_counts,
+        'server_by_type': server_by_type,
+        'server_by_mfg': server_by_mfg,
+        'server_by_os': server_by_os,
+        'cpu_list': cpu_list,
+        'os_list': os_list,
+        'servers_with_accelerators': servers_with_accelerators,
+        'data_source_breakdown': data_source_breakdown,
+        'servers_updated_30d': servers_updated_30d,
+    }
+    
+    return render(request, 'overwatch/admin_dashboard.html', context)
+
+
+@login_required
+@require_POST
+@login_required
+def dashboard_data_api(request: HttpRequest) -> JsonResponse:
+    """API endpoint for real-time dashboard data updates (JSON)."""
+    
+    from django.db.models import Count, Avg
+    
+    # Quick statistics
+    stats = {
+        'servers': {
+            'total': Server.objects.count(),
+            'active': Server.objects.filter(status='active').count(),
+            'maintenance': Server.objects.filter(status='maintenance').count(),
+            'inactive': Server.objects.filter(status='inactive').count(),
+        },
+        'ips': {
+            'total': IPAM.objects.count(),
+            'available': IPAM.objects.filter(status='available').count(),
+            'assigned': IPAM.objects.filter(status='assigned').count(),
+            'reserved': IPAM.objects.filter(status='reserved').count(),
+        },
+        'hardware': {
+            'avg_cpu_cores': int(Server.objects.exclude(core_count__isnull=True).aggregate(avg=Avg('core_count'))['avg'] or 0),
+            'avg_memory_gb': int(Server.objects.exclude(total_mem__isnull=True).aggregate(avg=Avg('total_mem'))['avg'] or 0),
+        },
+        'notes': {
+            'total': Note.objects.count(),
+            'high_priority': Note.objects.filter(priority='high').count(),
+        }
+    }
+    
+    return JsonResponse(stats)

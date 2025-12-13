@@ -11,8 +11,9 @@ Key Logic:
 """
 from django.db.models.signals import post_save, post_delete, pre_delete
 from django.dispatch import receiver
+from django.contrib.auth.signals import user_logged_in
 import ipaddress as ip_lib
-from .models import Server, Subnet, IPAM
+from .models import Server, Subnet, IPAM, AuditEvent
 
 
 def find_subnet_for_ip(ip_str):
@@ -143,9 +144,10 @@ def sync_server_to_ipam(sender, instance, created, update_fields, **kwargs):
 def cleanup_server_ipam(sender, instance, **kwargs):
     """
     When a Server is deleted, remove server reference from IPAM but keep records.
+    For DHCP and subnet_not_exist IPs, delete them entirely.
     """
     try:
-        # For main IP - remove server reference if in static pool, delete if DHCP/orphan
+        # For main IP - remove server reference if in static pool, delete if DHCP/orphan/no-subnet
         if instance.ip_address:
             ipam = IPAM.objects.filter(ip_address=instance.ip_address).first()
             if ipam:
@@ -156,9 +158,10 @@ def cleanup_server_ipam(sender, instance, **kwargs):
                     ipam.status = "available"
                     ipam.save()
                 else:
+                    # Delete DHCP and subnet_not_exist IPs
                     ipam.delete()
         
-        # For BMC IP - remove server reference if in static pool, delete if DHCP/orphan
+        # For BMC IP - remove server reference if in static pool, delete if DHCP/orphan/no-subnet
         if instance.bmc_ip:
             ipam = IPAM.objects.filter(ip_address=instance.bmc_ip).first()
             if ipam:
@@ -213,3 +216,20 @@ def cleanup_subnet_ipam(sender, instance, **kwargs):
         IPAM.objects.filter(subnet=instance).delete()
     except Exception as e:
         print(f"Error cleaning up IPAM for deleted subnet {instance.name}: {e}")
+
+
+@receiver(user_logged_in)
+def log_user_login(sender, request, user, **kwargs):
+    """
+    Log user login events to AuditEvent.
+    """
+    try:
+        AuditEvent.objects.create(
+            user=user,
+            action="other",
+            entity_type="User",
+            entity_repr=user.username,
+            message=f"User {user.username} logged in"
+        )
+    except Exception as e:
+        print(f"Error logging user login: {e}")

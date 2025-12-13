@@ -1,0 +1,258 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Activity Log{% endblock %}
+
+{% block content %}
+<div class="w-full h-full flex flex-col min-h-0">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-semibold text-slate-900">Activity Log</h1>
+    <button 
+      id="purge-btn-step1"
+      onclick="showPurgeConfirm()"
+      class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm flex items-center gap-2">
+      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+      </svg>
+      Delete Logs > 120 Days
+    </button>
+  </div>
+
+  <!-- 2-step confirmation modal -->
+  <div id="purge-confirm-step2" class="hidden mb-4 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+    <p class="text-sm font-semibold text-red-900 mb-2">⚠️ Are you absolutely sure?</p>
+    <p class="text-sm text-slate-700 mb-3">This action cannot be undone. All audit logs older than 120 days will be permanently deleted.</p>
+    <div class="flex gap-2">
+      <button 
+        onclick="executePurge()"
+        class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition font-medium text-sm">
+        Yes, Delete Permanently
+      </button>
+      <button 
+        onclick="cancelPurge()"
+        class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300 transition font-medium text-sm">
+        Cancel
+      </button>
+    </div>
+  </div>
+  <div id="purge-result" class="hidden mb-4 p-4 rounded-lg"></div>
+
+  <!-- Filters -->
+  <form method="get" class="grid grid-cols-1 md:grid-cols-6 gap-2 mb-4 items-end">
+    <div class="space-y-1">
+      <label class="text-xs font-medium text-slate-600">Search</label>
+      <input type="text" name="q" value="{{ query }}" placeholder="Search user, object, or message" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+    </div>
+    <div class="space-y-1">
+      <label class="text-xs font-medium text-slate-600">Event</label>
+      <select name="event" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+        {% for val,label in event_choices %}
+          <option value="{{ val }}" {% if event == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="space-y-1">
+      <label class="text-xs font-medium text-slate-600">User</label>
+      <select name="user" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+        <option value="">All users</option>
+        {% for u in users %}
+          <option value="{{ u.id }}" {% if selected_user == u.id %}selected{% endif %}>{{ u.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="space-y-1">
+      <label class="text-xs font-medium text-slate-600">Date preset</label>
+      <select name="date_preset" id="date-preset" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+        <option value="">All time</option>
+        <option value="today" {% if date_preset == 'today' %}selected{% endif %}>Today</option>
+        <option value="yesterday" {% if date_preset == 'yesterday' %}selected{% endif %}>Yesterday</option>
+        <option value="last7" {% if date_preset == 'last7' %}selected{% endif %}>Last 7 days</option>
+        <option value="last30" {% if date_preset == 'last30' %}selected{% endif %}>Last 30 days</option>
+        <option value="thisMonth" {% if date_preset == 'thisMonth' %}selected{% endif %}>This month</option>
+        <option value="lastMonth" {% if date_preset == 'lastMonth' %}selected{% endif %}>Last month</option>
+        <option value="custom" {% if date_preset == 'custom' %}selected{% endif %}>Custom range</option>
+      </select>
+    </div>
+    <div class="space-y-1" id="date-start-wrap">
+      <label class="text-xs font-medium text-slate-600">From</label>
+      <input type="date" name="date_from" value="{{ date_from }}" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+    </div>
+    <div class="space-y-1" id="date-end-wrap">
+      <label class="text-xs font-medium text-slate-600">To</label>
+      <input type="date" name="date_to" value="{{ date_to }}" class="w-full rounded border border-slate-300 text-xs px-2 py-1">
+    </div>
+    <div class="md:col-span-6 flex gap-2">
+      <button class="px-3 py-2 bg-blue-600 text-white rounded text-sm">Filter</button>
+      <a href="{% url 'overwatch:activity_log' %}" class="px-3 py-2 bg-slate-100 text-slate-700 rounded text-sm">Reset</a>
+    </div>
+  </form>
+
+  <!-- Table -->
+  <div class="flex-1 min-h-0 overflow-auto border border-slate-200 rounded">
+    <table class="w-full text-xs">
+      <thead class="bg-slate-50 border-b border-slate-200 sticky top-0">
+        <tr>
+          <th class="px-3 py-1.5 text-left text-xs font-medium">Time</th>
+          <th class="px-3 py-1.5 text-left text-xs font-medium">User</th>
+          <th class="px-3 py-1.5 text-left text-xs font-medium">Event</th>
+          <th class="px-3 py-1.5 text-left text-xs font-medium">Object</th>
+          <th class="px-3 py-1.5 text-left text-xs font-medium">Message</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-200">
+        {% for entry in page_obj.object_list %}
+        <tr class="hover:bg-slate-50">
+          <td class="px-3 py-1.5 text-slate-600 whitespace-nowrap">{{ entry.created_at|date:"Y-m-d H:i" }}</td>
+          <td class="px-3 py-1.5 whitespace-nowrap">{{ entry.user.username|default:"system" }}</td>
+          <td class="px-3 py-1.5">
+            {% if entry.action == 'create' %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-green-100 text-green-700">Create</span>
+            {% elif entry.action == 'update' %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-blue-100 text-blue-700">Update</span>
+            {% elif entry.action == 'delete' %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-red-100 text-red-700">Delete</span>
+            {% elif entry.action == 'note' %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-amber-100 text-amber-800">Note</span>
+            {% elif entry.action == 'ipam' %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-indigo-100 text-indigo-700">IPAM</span>
+            {% else %}
+              <span class="px-1.5 py-0.5 text-xs rounded bg-slate-100 text-slate-700">Other</span>
+            {% endif %}
+          </td>
+          <td class="px-3 py-1.5">
+            <span class="text-slate-800 font-medium">{{ entry.entity_type }}</span>
+            <span class="text-slate-500">— {{ entry.entity_repr }}</span>
+          </td>
+          <td class="px-3 py-1.5 text-slate-700">{{ entry.message }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="px-3 py-4 text-center text-slate-500 text-xs">No log entries found for the selected filters.</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="flex items-center justify-between mt-4 text-sm text-slate-700">
+    <div>Page size:
+      {% for size in page_sizes %}
+        <a href="?page_size={{ size }}" class="px-2 py-1 rounded border {% if size == page_size %}bg-slate-200 border-slate-300{% else %}border-slate-200{% endif %}">{{ size }}</a>
+      {% endfor %}
+    </div>
+    <div class="flex items-center gap-1">
+      {% for i in elided_pages %}
+        {% if i == '…' %}
+          <span class="px-2">…</span>
+        {% elif i == page_obj.number %}
+          <span class="px-2 py-1 rounded bg-blue-600 text-white">{{ i }}</span>
+        {% else %}
+          <a href="?page={{ i }}" class="px-2 py-1 rounded bg-slate-100 text-slate-700">{{ i }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const preset = document.getElementById('date-preset');
+    const startWrap = document.getElementById('date-start-wrap');
+    const endWrap = document.getElementById('date-end-wrap');
+    const toggleCustom = () => {
+      const isCustom = preset.value === 'custom';
+      startWrap.classList.toggle('hidden', !isCustom);
+      endWrap.classList.toggle('hidden', !isCustom);
+    };
+    toggleCustom();
+    preset.addEventListener('change', () => {
+      toggleCustom();
+      if (preset.value !== 'custom') {
+        const startInput = startWrap.querySelector('input');
+        const endInput = endWrap.querySelector('input');
+        if (startInput) startInput.value = '';
+        if (endInput) endInput.value = '';
+      }
+    });
+  })();
+
+  function showPurgeConfirm() {
+    document.getElementById('purge-btn-step1').classList.add('hidden');
+    document.getElementById('purge-confirm-step2').classList.remove('hidden');
+  }
+
+  function cancelPurge() {
+    document.getElementById('purge-btn-step1').classList.remove('hidden');
+    document.getElementById('purge-confirm-step2').classList.add('hidden');
+  }
+
+  function executePurge() {
+    const confirmBtn = document.querySelector('#purge-confirm-step2 button[onclick="executePurge()"]');
+    const originalText = confirmBtn.textContent;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting...';
+
+    fetch('{% url "overwatch:purge_old_audit_logs" %}', {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': '{{ csrf_token }}',
+        'Content-Type': 'application/json',
+      }
+    })
+    .then(response => response.json())
+    .then(data => {
+      const resultDiv = document.getElementById('purge-result');
+      document.getElementById('purge-confirm-step2').classList.add('hidden');
+      resultDiv.classList.remove('hidden');
+      
+      if (data.success) {
+        resultDiv.className = 'mb-4 p-4 rounded-lg bg-green-100 border border-green-300 text-green-800';
+        resultDiv.innerHTML = `
+          <div class="flex items-start gap-2">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+            </svg>
+            <div>
+              <p class="font-semibold">Success!</p>
+              <p class="text-sm">${data.message}</p>
+            </div>
+          </div>
+        `;
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      } else {
+        resultDiv.className = 'mb-4 p-4 rounded-lg bg-red-100 border border-red-300 text-red-800';
+        resultDiv.innerHTML = `
+          <div class="flex items-start gap-2">
+            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <div>
+              <p class="font-semibold">Error</p>
+              <p class="text-sm">${data.message}</p>
+            </div>
+          </div>
+        `;
+        document.getElementById('purge-btn-step1').classList.remove('hidden');
+      }
+      
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = originalText;
+    })
+    .catch(error => {
+      console.error('Error purging logs:', error);
+      const resultDiv = document.getElementById('purge-result');
+      document.getElementById('purge-confirm-step2').classList.add('hidden');
+      resultDiv.classList.remove('hidden');
+      resultDiv.className = 'mb-4 p-4 rounded-lg bg-red-100 border border-red-300 text-red-800';
+      resultDiv.textContent = 'Network error occurred. Please try again.';
+      
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = originalText;
+      document.getElementById('purge-btn-step1').classList.remove('hidden');
+    });
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Admin Dashboard - System & User Tracking{% endblock %}
+
+{% block content %}
+<div class="bg-white flex-1 flex flex-col overflow-hidden min-h-0">
+    <div class="px-4 pt-4 flex-shrink-0">
+        <!-- Header -->
+        <div class="mb-6">
+            <h1 class="text-4xl font-bold text-slate-900 mb-2">Admin Dashboard</h1>
+            <p class="text-slate-600">Real-time system and user tracking overview</p>
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto min-h-0 px-4 pb-4">
+    <!-- Top Statistics Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Total Servers -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-slate-600 text-sm font-medium">Total Servers</h3>
+                <svg class="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"></path>
+                    <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <p class="text-3xl font-bold text-slate-900">{{ total_servers }}</p>
+            <p class="text-xs text-slate-500 mt-2">
+                <span class="inline-block px-2 py-1 bg-green-100 text-green-700 rounded text-xs mr-1">{{ active_servers }} Active</span>
+                <span class="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 rounded text-xs">{{ maintenance_servers }} Maintenance</span>
+            </p>
+        </div>
+
+        <!-- Total Memory -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-slate-600 text-sm font-medium">Avg Memory</h3>
+                <svg class="w-5 h-5 text-purple-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 4a2 2 0 012-2h12a2 2 0 012 2v4a1 1 0 001 1H3a1 1 0 01-1-1V4zm14 0a1 1 0 00-1-1h-1a1 1 0 00-1 1v4a1 1 0 001 1h1a1 1 0 001-1V4z"></path>
+                    <path d="M2 13a1 1 0 011-1h2a1 1 0 011 1v3a1 1 0 01-1 1H3a1 1 0 01-1-1v-3z"></path>
+                    <path d="M15 13a1 1 0 011-1h2a1 1 0 011 1v3a1 1 0 01-1 1h-2a1 1 0 01-1-1v-3z"></path>
+                </svg>
+            </div>
+            <p class="text-3xl font-bold text-slate-900">{{ avg_memory }}<span class="text-lg text-slate-500">GB</span></p>
+            <p class="text-xs text-slate-500 mt-2">Average per server</p>
+        </div>
+
+        <!-- Total Storage -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-slate-600 text-sm font-medium">Total Storage</h3>
+                <svg class="w-5 h-5 text-orange-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 12V4a1 1 0 011-1h12a1 1 0 011 1v8a1 1 0 11-2 0V5H4v7a1 1 0 11-2 0z"></path>
+                    <path d="M14.586 7l-3-3a1 1 0 00-1.414 1.414L12.172 8l-2-2a1 1 0 10-1.414 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414z"></path>
+                </svg>
+            </div>
+            <p class="text-3xl font-bold text-slate-900">{{ total_disk_space }}<span class="text-lg text-slate-500">TB</span></p>
+            <p class="text-xs text-slate-500 mt-2">Across all disks</p>
+        </div>
+
+        <!-- Average CPU Cores -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 hover:shadow-md transition">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-slate-600 text-sm font-medium">Avg CPU Cores</h3>
+                <svg class="w-5 h-5 text-indigo-500" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"></path>
+                    <path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clip-rule="evenodd"></path>
+                </svg>
+            </div>
+            <p class="text-3xl font-bold text-slate-900">{{ avg_cpu_cores }}</p>
+            <p class="text-xs text-slate-500 mt-2">Cores per server</p>
+        </div>
+    </div>
+
+    <!-- Server Status Overview -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Server Status Distribution -->
+        <div class="lg:col-span-2 bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Server Status Distribution</h2>
+            <div class="space-y-3">
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-slate-700">Active</span>
+                        <span class="text-sm font-semibold text-green-600">{{ active_servers }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div class="bg-green-500 h-2.5 rounded-full" style="width: {% if total_servers %}{{ active_servers|floatformat:0 }}%{% else %}0%{% endif %}"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-slate-700">Maintenance</span>
+                        <span class="text-sm font-semibold text-yellow-600">{{ maintenance_servers }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div class="bg-yellow-500 h-2.5 rounded-full" style="width: {% if total_servers %}{{ maintenance_servers|floatformat:0 }}%{% else %}0%{% endif %}"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-slate-700">Inactive</span>
+                        <span class="text-sm font-semibold text-slate-600">{{ inactive_servers }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div class="bg-slate-400 h-2.5 rounded-full" style="width: {% if total_servers %}{{ inactive_servers|floatformat:0 }}%{% else %}0%{% endif %}"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between mb-1">
+                        <span class="text-sm font-medium text-slate-700">Decommissioned</span>
+                        <span class="text-sm font-semibold text-red-600">{{ decommissioned_servers }}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-2.5">
+                        <div class="bg-red-500 h-2.5 rounded-full" style="width: {% if total_servers %}{{ decommissioned_servers|floatformat:0 }}%{% else %}0%{% endif %}"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Updates -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 flex flex-col" style="max-height: 320px;">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4 flex-shrink-0">Recent Server Updates</h2>
+            <div class="space-y-2 overflow-y-auto flex-1 min-h-0">
+                {% if recent_servers %}
+                    {% for server in recent_servers %}
+                    <div class="text-sm border-b border-slate-100 pb-2 last:border-b-0">
+                        <a href="{% url 'overwatch:server_detail' server.pk %}" class="font-medium text-blue-600 hover:text-blue-700">
+                            {{ server.hostname }}
+                        </a>
+                        <p class="text-xs text-slate-500">Updated: {{ server.updated_at|date:"M d, g:i A" }}</p>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p class="text-slate-500 text-sm">No recent updates</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Network & IPAM Statistics -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- IP Address Status -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">IP Address Allocation</h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Total IPs</span>
+                    <span class="font-semibold text-slate-900">{{ total_ips }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Available</span>
+                    <span class="inline-block px-3 py-1 bg-green-100 text-green-700 text-sm rounded font-medium">{{ available_ips }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Assigned</span>
+                    <span class="inline-block px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded font-medium">{{ assigned_ips }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Reserved</span>
+                    <span class="inline-block px-3 py-1 bg-amber-100 text-amber-700 text-sm rounded font-medium">{{ reserved_ips }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Conflicts</span>
+                    <span class="inline-block px-3 py-1 bg-red-100 text-red-700 text-sm rounded font-medium">{{ conflict_ips }}</span>
+                </div>
+                <hr class="my-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium text-slate-700">Allocation Rate</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ ip_allocation_percentage }}%</span>
+                </div>
+                <div class="w-full bg-slate-100 rounded-full h-3">
+                    <div class="bg-gradient-to-r from-blue-500 to-blue-600 h-3 rounded-full" style="width: {{ ip_allocation_percentage }}%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Subnets Overview -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Network Overview</h2>
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span class="text-sm text-slate-600">Total Subnets</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ total_subnets }}</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span class="text-sm text-slate-600">Active NICs</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ active_nic_count }}</span>
+                </div>
+                <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                    <span class="text-sm text-slate-600">Servers w/ Accelerators</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ servers_with_accelerators }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hardware & Software Breakdown -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Top CPUs -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 flex flex-col" style="max-height: 320px;">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4 flex-shrink-0">Top CPUs Used</h2>
+            {% if cpu_list %}
+                <div class="space-y-2 overflow-y-auto flex-1 min-h-0">
+                    {% for cpu in cpu_list %}
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                        <span class="text-sm text-slate-600 truncate">{{ cpu.cpu }}</span>
+                        <span class="inline-block px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded font-semibold">{{ cpu.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No CPU data available</p>
+            {% endif %}
+        </div>
+
+        <!-- Top Operating Systems -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 flex flex-col" style="max-height: 320px;">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4 flex-shrink-0">Top Operating Systems</h2>
+            {% if os_list %}
+                <div class="space-y-2 overflow-y-auto flex-1 min-h-0">
+                    {% for os in os_list %}
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                        <span class="text-sm text-slate-600 truncate">{{ os.os }}</span>
+                        <span class="inline-block px-2 py-1 bg-green-100 text-green-700 text-xs rounded font-semibold">{{ os.count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No OS data available</p>
+            {% endif %}
+        </div>
+
+        <!-- Top Manufacturers -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6 flex flex-col" style="max-height: 320px;">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4 flex-shrink-0">Top Manufacturers</h2>
+            {% if server_by_mfg %}
+                <div class="space-y-2 overflow-y-auto flex-1 min-h-0">
+                    {% for mfg, count in server_by_mfg.items|slice:":5" %}
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                        <span class="text-sm text-slate-600 truncate">{{ mfg }}</span>
+                        <span class="inline-block px-2 py-1 bg-purple-100 text-purple-700 text-xs rounded font-semibold">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No manufacturer data</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Categories & Tags -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        <!-- Device Categories -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Device Categories</h2>
+            {% if categories %}
+                <div class="space-y-2">
+                    {% for category in categories|slice:":8" %}
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                        <span class="text-sm text-slate-600">{{ category.device_type }}</span>
+                        <span class="inline-block px-2 py-1 bg-cyan-100 text-cyan-700 text-xs rounded font-semibold">{{ category.server_count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No category data available</p>
+            {% endif %}
+        </div>
+
+        <!-- Top Tags -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Popular Tags</h2>
+            {% if tags_with_counts %}
+                <div class="flex flex-wrap gap-2">
+                    {% for tag in tags_with_counts|slice:":12" %}
+                    <span class="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 text-slate-700 text-sm rounded-full hover:bg-slate-200 transition">
+                        {{ tag.name }}
+                        <span class="inline-block px-1.5 py-0.5 bg-slate-200 text-slate-600 text-xs rounded-full font-semibold">{{ tag.server_count }}</span>
+                    </span>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No tag data available</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Notes & Activity Tracking -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        <!-- Notes Summary -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Notes Summary</h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Total Notes</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ total_notes }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">High Priority</span>
+                    <span class="inline-block px-3 py-1 bg-red-100 text-red-700 text-sm rounded font-medium">{{ high_priority_notes }}</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Medium Priority</span>
+                    <span class="inline-block px-3 py-1 bg-yellow-100 text-yellow-700 text-sm rounded font-medium">{{ medium_priority_notes }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Source -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Data Sources</h2>
+            {% if data_source_breakdown %}
+                <div class="space-y-2">
+                    {% for source, count in data_source_breakdown.items %}
+                    <div class="flex items-center justify-between p-2 hover:bg-slate-50 rounded">
+                        <span class="text-sm text-slate-600 capitalize">{{ source }}</span>
+                        <span class="inline-block px-2 py-1 bg-slate-200 text-slate-700 text-xs rounded font-semibold">{{ count }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-slate-500 text-sm">No data source information</p>
+            {% endif %}
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+            <h2 class="text-lg font-semibold text-slate-900 mb-4">Activity Summary</h2>
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-600">Updated (30 days)</span>
+                    <span class="text-2xl font-bold text-slate-900">{{ servers_updated_30d }}</span>
+                </div>
+                <div class="p-3 bg-blue-50 rounded-lg">
+                    <p class="text-xs text-slate-600"><strong>Last Updated:</strong> Just now</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Notes Activity -->
+    {% if recent_notes %}
+    <div class="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+        <h2 class="text-lg font-semibold text-slate-900 mb-4">Recent Notes Activity</h2>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead class="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-slate-600 font-medium">Server</th>
+                        <th class="px-4 py-3 text-left text-slate-600 font-medium">Note Preview</th>
+                        <th class="px-4 py-3 text-left text-slate-600 font-medium">Priority</th>
+                        <th class="px-4 py-3 text-left text-slate-600 font-medium">Updated By</th>
+                        <th class="px-4 py-3 text-left text-slate-600 font-medium">Time</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-200">
+                    {% for note in recent_notes %}
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="px-4 py-3">
+                            <a href="{% url 'overwatch:server_detail' note.server.pk %}" class="text-blue-600 hover:text-blue-700 font-medium">
+                                {{ note.server.hostname }}
+                            </a>
+                        </td>
+                        <td class="px-4 py-3 text-slate-600 truncate max-w-xs">{{ note.content|truncatewords:10 }}</td>
+                        <td class="px-4 py-3">
+                            {% if note.priority == "high" %}
+                                <span class="inline-block px-2 py-1 bg-red-100 text-red-700 text-xs rounded font-semibold">High</span>
+                            {% elif note.priority == "medium" %}
+                                <span class="inline-block px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded font-semibold">Medium</span>
+                            {% elif note.priority == "low" %}
+                                <span class="inline-block px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded font-semibold">Low</span>
+                            {% else %}
+                                <span class="inline-block px-2 py-1 bg-slate-100 text-slate-700 text-xs rounded font-semibold">Info</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-4 py-3 text-slate-600">{{ note.updated_by.username|default:"System" }}</td>
+                        <td class="px-4 py-3 text-slate-500 text-xs">{{ note.updated_at|date:"M d, g:i A" }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Quick Actions -->
+    <div class="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+        <h3 class="text-lg font-semibold text-blue-900 mb-4">Quick Actions</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <a href="{% url 'overwatch:server_list' %}" class="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-sm">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"></path><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6z" clip-rule="evenodd"></path></svg>
+                View Servers
+            </a>
+            <a href="{% url 'overwatch:ipam_list' %}" class="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-sm">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                IP Management
+            </a>
+            <a href="{% url 'overwatch:server_create' %}" class="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-sm">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clip-rule="evenodd"></path></svg>
+                Add Server
+            </a>
+            <a href="{% url 'overwatch:dictionary_list' %}" class="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-blue-200 text-blue-600 rounded-lg hover:bg-blue-100 transition font-medium text-sm">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"></path><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H4a1 1 0 00-1 1v10a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 000-2h2a2 2 0 012 2v10a2 2 0 01-2 2H4a2 2 0 01-2-2V5z" clip-rule="evenodd"></path></svg>
+                Data Mapping
+            </a>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-refresh dashboard data every 60 seconds
+    function refreshDashboardData() {
+        fetch('{% url "overwatch:dashboard_data_api" %}', {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log('Dashboard data refreshed:', data);
+            // Update UI elements with real-time data if needed
+        })
+        .catch(error => console.error('Error refreshing dashboard:', error));
+    }
+
+    // Uncomment to enable auto-refresh
+    // setInterval(refreshDashboardData, 60000);
+</script>
+</div>
+{% endblock %}

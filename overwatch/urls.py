@@ -5,6 +5,10 @@ from . import views
 app_name = "overwatch"
 
 urlpatterns = [
+    path("logs/", views.activity_log, name="activity_log"),
+    path("logs/purge/", views.purge_old_audit_logs, name="purge_old_audit_logs"),
+    path("dashboard/", views.admin_dashboard, name="admin_dashboard"),
+    path("dashboard/api/data/", views.dashboard_data_api, name="dashboard_data_api"),
     path("", views.server_list, name="server_list"),
     path("servers/<int:pk>/", views.server_detail, name="server_detail"),
     path("servers/add/", views.server_create, name="server_create"),

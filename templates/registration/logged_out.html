@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Logged Out - NexHub</title>
+    {% load static %}
+    <script src="{% static 'js/tailwind.min.js' %}"></script>
+    <link href="{% static 'css/flowbite.min.css' %}" rel="stylesheet" />
+</head>
+<body class="h-full flex items-center justify-center">
+    <div class="w-full max-w-md">
+        <!-- Logo and Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-blue-900 mb-4">
+                <span class="text-3xl font-bold text-white">NH</span>
+            </div>
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Logged Out</h1>
+            <p class="text-slate-600">You have been successfully logged out.</p>
+        </div>
+
+        <!-- Logout Card -->
+        <div class="bg-white rounded-lg shadow-lg border border-slate-200 p-8">
+            <div class="text-center mb-6">
+                <svg class="mx-auto w-16 h-16 text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h2 class="text-xl font-semibold text-slate-900 mb-2">See you soon!</h2>
+                <p class="text-slate-600 text-sm">Thank you for using NexHub.</p>
+            </div>
+
+            <div class="space-y-3">
+                <a href="{% url 'login' %}" class="block w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-sm transition duration-150 ease-in-out text-center">
+                    Sign In Again
+                </a>
+                <a href="/admin/" class="block w-full py-3 px-4 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg transition duration-150 ease-in-out text-center">
+                    Admin Login
+                </a>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="mt-8 text-center">
+            <p class="text-sm text-slate-500">
+                © 2025 NexHub. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

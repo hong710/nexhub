@@ -448,3 +448,34 @@ class Note(BaseModel):
 
     def __str__(self) -> str:
         return f"Note for {self.server.hostname} ({self.priority})"
+
+
+class AuditEvent(models.Model):
+    """User activity log for app events (kept for 90 days)."""
+
+    ACTION_CHOICES = [
+        ("create", "Create"),
+        ("update", "Update"),
+        ("delete", "Delete"),
+        ("note", "Note"),
+        ("ipam", "IPAM"),
+        ("other", "Other"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    entity_type = models.CharField(max_length=100)
+    entity_id = models.PositiveIntegerField(null=True, blank=True)
+    entity_repr = models.CharField(max_length=255, blank=True, null=True)
+    message = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["created_at", "entity_type", "action"]),
+        ]
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        user = self.user.username if self.user else "system"
+        return f"[{self.created_at:%Y-%m-%d %H:%M}] {user} {self.action} {self.entity_type} {self.entity_repr}"

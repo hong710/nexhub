@@ -47,7 +47,7 @@
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v6h6M20 20v-6h-6M20 4h-6m0 0L20 10M8 20h6m0 0L8 14" />
                 </svg>
-                <span class="text-xs font-medium">Reset</span>
+                <span class="text-xs font-medium">Clear Filters</span>
             </button>
             <a
                 href="{% url 'overwatch:server_create' %}"
@@ -89,7 +89,23 @@
         const btn = document.getElementById('reset-table');
         if (!btn) return;
         btn.addEventListener('click', () => {
-            window.location.href = window.location.pathname;
+            // Clear search input
+            const searchInput = document.getElementById('search');
+            if (searchInput) searchInput.value = '';
+            
+            // Clear all active filters
+            window.__activeFilterState = {};
+            
+            // Trigger HTMX request to reload table data without any filters
+            htmx.ajax('GET', window.location.pathname, {
+                target: '#server-table-wrapper',
+                swap: 'innerHTML'
+            }).then(() => {
+                // Re-apply column toggles after table reload
+                applyColumnToggles();
+                // Update filter indicators to show no active filters
+                updateFilterIndicators();
+            });
         });
     }
 
@@ -101,6 +117,141 @@
             const btn = header.querySelector(`[data-filter-btn="${col}"]`);
             if (!panel || !btn) return;
             const tagOptions = header.dataset.tagOptions ? header.dataset.tagOptions.split(',').filter(Boolean) : null;
+
+            // Special handling for date columns
+            if (col === 'updated_at') {
+                const buildDatePanel = () => {
+                    let selectedPreset = window.__dateFilterState?.preset || null;
+                    let customStart = window.__dateFilterState?.startDate || '';
+                    let customEnd = window.__dateFilterState?.endDate || '';
+
+                    panel.innerHTML = `
+                        <div class="p-3 space-y-3 text-slate-800 w-64">
+                            <div class="space-y-2">
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="today" ${selectedPreset === 'today' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Today</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="yesterday" ${selectedPreset === 'yesterday' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Yesterday</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="last7" ${selectedPreset === 'last7' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Last 7 days</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="last30" ${selectedPreset === 'last30' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Last 30 days</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="thisMonth" ${selectedPreset === 'thisMonth' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>This month</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="lastMonth" ${selectedPreset === 'lastMonth' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Last month</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="allTime" ${selectedPreset === 'allTime' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>All time</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-slate-700 cursor-pointer">
+                                    <input type="radio" name="date-preset" value="custom" ${selectedPreset === 'custom' ? 'checked' : ''} class="rounded border-slate-300" />
+                                    <span>Custom range</span>
+                                </label>
+                            </div>
+
+                            <div class="custom-date-range space-y-2 ${selectedPreset === 'custom' ? '' : 'hidden'}">
+                                <div class="space-y-1">
+                                    <label class="text-xs font-semibold text-slate-700">Start date</label>
+                                    <input type="date" class="date-start w-full rounded border border-slate-300 text-xs px-2 py-1" value="${customStart}" />
+                                </div>
+                                <div class="space-y-1">
+                                    <label class="text-xs font-semibold text-slate-700">End date</label>
+                                    <input type="date" class="date-end w-full rounded border border-slate-300 text-xs px-2 py-1" value="${customEnd}" />
+                                </div>
+                            </div>
+
+                            <div class="flex items-center gap-2 justify-end text-xs pt-1">
+                                <button type="button" data-filter-apply="${col}" class="px-3 py-1 rounded bg-blue-600 text-white border border-blue-600 hover:bg-blue-700">Apply</button>
+                                <button type="button" data-filter-cancel="${col}" class="px-3 py-1 rounded bg-slate-100 border border-slate-200 hover:bg-slate-200">Cancel</button>
+                            </div>
+                        </div>
+                    `;
+
+                    // Handle radio button changes
+                    const radios = panel.querySelectorAll('input[name="date-preset"]');
+                    const customRangeDiv = panel.querySelector('.custom-date-range');
+                    radios.forEach((radio) => {
+                        radio.addEventListener('change', () => {
+                            if (radio.value === 'custom') {
+                                customRangeDiv.classList.remove('hidden');
+                            } else {
+                                customRangeDiv.classList.add('hidden');
+                            }
+                        });
+                    });
+
+                    // Handle apply button
+                    const applyBtn = panel.querySelector(`[data-filter-apply="${col}"]`);
+                    applyBtn.addEventListener('click', () => {
+                        const selectedRadio = panel.querySelector('input[name="date-preset"]:checked');
+                        const preset = selectedRadio?.value;
+                        
+                        if (!window.__dateFilterState) {
+                            window.__dateFilterState = {};
+                        }
+
+                        if (preset === 'custom') {
+                            const startDate = panel.querySelector('.date-start').value;
+                            const endDate = panel.querySelector('.date-end').value;
+                            if (!startDate || !endDate) {
+                                alert('Please select both start and end dates');
+                                return;
+                            }
+                            window.__dateFilterState = { preset: 'custom', startDate, endDate };
+                        } else {
+                            window.__dateFilterState = { preset };
+                        }
+
+                        applyFilters();
+                        panel.classList.add('hidden');
+                    });
+
+                    // Handle cancel button
+                    const cancelBtn = panel.querySelector(`[data-filter-cancel="${col}"]`);
+                    cancelBtn.addEventListener('click', () => {
+                        panel.classList.add('hidden');
+                    });
+                };
+
+                btn.addEventListener('click', () => {
+                    const currentlyOpen = document.querySelectorAll('[data-filter-panel]');
+                    currentlyOpen.forEach((p) => {
+                        if (p !== panel) p.classList.add('hidden');
+                    });
+                    buildDatePanel();
+                    panel.classList.toggle('hidden');
+                    if (!panel.classList.contains('hidden')) {
+                        const rect = panel.getBoundingClientRect();
+                        if (rect.top < 0) {
+                            panel.style.marginTop = `${Math.abs(rect.top) + 8}px`;
+                        } else {
+                            panel.style.marginTop = "0";
+                        }
+                        let shift = 0;
+                        if (rect.left < 8) {
+                            shift = 8 - rect.left;
+                        } else if (rect.right > window.innerWidth - 8) {
+                            shift = (window.innerWidth - 8) - rect.right;
+                        }
+                        panel.style.marginLeft = `${shift}px`;
+                    }
+                });
+
+                return; // Skip default filter logic for date column
+            }
 
             const buildPanel = () => {
                 // Get ALL rows from the table (including hidden ones) to show all distinct values
@@ -281,32 +432,124 @@
 
     function applyFilters() {
         const rows = document.querySelectorAll('tbody tr[data-row]');
+        
+        // Get date filter state
+        const dateState = window.__dateFilterState;
+        let dateStart = null, dateEnd = null;
+        
+        if (dateState) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const tomorrow = new Date(today);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            
+            const yesterday = new Date(today);
+            yesterday.setDate(yesterday.getDate() - 1);
+            
+            const last7 = new Date(today);
+            last7.setDate(last7.getDate() - 7);
+            
+            const last30 = new Date(today);
+            last30.setDate(last30.getDate() - 30);
+            
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            monthEnd.setHours(23, 59, 59, 999);
+            
+            const lastMonthStart = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+            const lastMonthEnd = new Date(today.getFullYear(), today.getMonth(), 0);
+            lastMonthEnd.setHours(23, 59, 59, 999);
+            
+            switch(dateState.preset) {
+                case 'today':
+                    dateStart = today;
+                    dateEnd = tomorrow;
+                    break;
+                case 'yesterday':
+                    dateStart = yesterday;
+                    dateEnd = today;
+                    break;
+                case 'last7':
+                    dateStart = last7;
+                    dateEnd = tomorrow;
+                    break;
+                case 'last30':
+                    dateStart = last30;
+                    dateEnd = tomorrow;
+                    break;
+                case 'thisMonth':
+                    dateStart = monthStart;
+                    dateEnd = monthEnd;
+                    break;
+                case 'lastMonth':
+                    dateStart = lastMonthStart;
+                    dateEnd = lastMonthEnd;
+                    break;
+                case 'custom':
+                    if (dateState.startDate && dateState.endDate) {
+                        dateStart = new Date(dateState.startDate);
+                        dateStart.setHours(0, 0, 0, 0);
+                        dateEnd = new Date(dateState.endDate);
+                        dateEnd.setHours(23, 59, 59, 999);
+                    }
+                    break;
+                case 'allTime':
+                default:
+                    dateStart = null;
+                    dateEnd = null;
+            }
+        }
+        
         rows.forEach((row) => {
             let visible = true;
-            for (const [col, values] of Object.entries(window.__activeFilterState)) {
-                if (!values || values.size === 0) {
-                    continue; // empty means no filter applied on this column
-                }
-                const cell = row.querySelector(`td[data-col="${col}"]`);
-                if (!cell) continue;
-                if (col === 'tags') {
-                    const raw = cell.dataset.tags || "";
-                    const tagList = raw ? raw.split(',').map((t) => t.trim()).filter(Boolean) : [];
-                    const hasNoTagSelected = values.has("__NO_TAG__");
-                    const hasMatchTag = tagList.some((t) => values.has(t));
-                    const hasMatch = (hasNoTagSelected && tagList.length === 0) || hasMatchTag;
-                    if (!hasMatch) {
+            
+            // Check date filter first
+            if (dateStart && dateEnd) {
+                const cell = row.querySelector('td[data-col="updated_at"]');
+                if (cell) {
+                    const dateStr = cell.textContent.trim();
+                    // Parse "2025-12-13 10:30" format
+                    const datePart = dateStr.split(' ')[0];
+                    const rowDate = new Date(datePart);
+                    rowDate.setHours(12, 0, 0, 0);
+                    
+                    if (rowDate < dateStart || rowDate > dateEnd) {
                         visible = false;
-                        break;
-                    }
-                } else {
-                    const cellVal = (cell.textContent || "").trim();
-                    if (!values.has(cellVal)) {
-                        visible = false;
-                        break;
                     }
                 }
             }
+            
+            // Check other column filters
+            if (visible) {
+                for (const [col, values] of Object.entries(window.__activeFilterState)) {
+                    if (!values || values.size === 0) {
+                        continue; // empty means no filter applied on this column
+                    }
+                    if (col === 'updated_at') {
+                        continue; // skip, handled above
+                    }
+                    const cell = row.querySelector(`td[data-col="${col}"]`);
+                    if (!cell) continue;
+                    if (col === 'tags') {
+                        const raw = cell.dataset.tags || "";
+                        const tagList = raw ? raw.split(',').map((t) => t.trim()).filter(Boolean) : [];
+                        const hasNoTagSelected = values.has("__NO_TAG__");
+                        const hasMatchTag = tagList.some((t) => values.has(t));
+                        const hasMatch = (hasNoTagSelected && tagList.length === 0) || hasMatchTag;
+                        if (!hasMatch) {
+                            visible = false;
+                            break;
+                        }
+                    } else {
+                        const cellVal = (cell.textContent || "").trim();
+                        if (!values.has(cellVal)) {
+                            visible = false;
+                            break;
+                        }
+                    }
+                }
+            }
+            
             row.classList.toggle('hidden', !visible);
         });
         updateFilterIndicators();
